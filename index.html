@@ -1,289 +1,234 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TALKIE-WALKIE MATRIX</title>
-    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>P2P CALL</title>
 
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 
-        * { margin:0; padding:0; box-sizing:border-box; }
-        body {
-            overflow: hidden;
-            background: #000;
-            color: #0f0;
-            font-family: 'VT323', monospace;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            position: relative;
-            padding: 10px;
-        }
+<style>
+body {
+    margin:0;
+    background:black;
+    color:#0f0;
+    font-family: monospace;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    height:100vh;
+    overflow:hidden;
+}
 
-        #matrix {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            z-index: 1;
-            opacity: 0.85;
-        }
+/* MATRIX */
+canvas {
+    position:fixed;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
+    z-index:0;
+}
 
-        .overlay {
-            position: relative;
-            z-index: 2;
-            width: 100%;
-            max-width: 360px;
-            background: rgba(10, 10, 10, 0.92);
-            border: 5px solid #0f0;
-            border-radius: 12px;
-            padding: 20px 18px;
-            box-shadow: 0 0 50px #0f0;
-            text-align: center;
-            max-height: 100vh;
-            overflow-y: auto;
-        }
+/* BOX */
+.box {
+    position:relative;
+    z-index:1;
+    width:92%;
+    max-width:320px;
+    background:rgba(0,0,0,0.9);
+    border:2px solid #0f0;
+    border-radius:12px;
+    padding:14px;
+    text-align:center;
+    box-sizing:border-box;
+}
 
-        h1 { font-size: 34px; margin-bottom: 8px; }
+h2 {
+    margin:5px 0 10px;
+}
 
-        input {
-            width: 100%;
-            padding: 12px;
-            margin: 10px 0;
-            background: #111;
-            border: 3px solid #0f0;
-            color: #0f0;
-            font-size: 22px;
-            text-align: center;
-        }
+/* INPUTS + BUTTONS */
+input, button {
+    width:100%;
+    height:42px;
+    margin:5px 0;
+    padding:0 10px;
+    background:#111;
+    border:2px solid #0f0;
+    color:#0f0;
+    font-size:15px;
+    text-align:center;
+    border-radius:6px;
+    box-sizing:border-box;
+}
 
-        button.small {
-            background: #111;
-            color: #0f0;
-            border: 3px solid #0f0;
-            padding: 9px 18px;
-            margin: 6px;
-            font-size: 19px;
-        }
+/* STATUS */
+#status {
+    margin-top:8px;
+    font-size:13px;
+}
 
-        #talkBtn {
-            width: 100%;
-            max-width: 240px;
-            height: 110px;
-            margin: 25px auto;
-            background: rgba(200, 0, 0, 0.78);
-            border: 6px solid #ddd;
-            border-radius: 12px;
-            color: white;
-            font-size: 38px;
-            font-weight: bold;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow:
-                0 10px 25px rgba(255,0,0,0.6),
-                inset 0 8px 15px rgba(255,255,255,0.4),
-                inset 0 -8px 15px rgba(0,0,0,0.6);
-        }
+/* TALK BUTTON */
+#talk {
+    width:110px;
+    height:110px;
+    margin:15px auto;
+    border-radius:50%;
+    border:none;
+    cursor:pointer;
 
-        #talkBtn:active {
-            background: rgba(0, 255, 0, 0.85);
-            color: #000;
-            border-color: #0f0;
-            transform: scale(0.96);
-        }
+    /* bouton rouge propre sans image (100% fiable) */
+    background:radial-gradient(circle at 30% 30%, #ff4d4d, #cc0000);
 
-        #status { font-size: 22px; min-height: 45px; }
+    box-shadow:
+        0 0 25px rgba(255,0,0,0.8),
+        inset 0 0 20px rgba(255,255,255,0.3);
+}
 
-        .connected-list {
-            background: #111;
-            border: 3px solid #0f0;
-            padding: 10px;
-            max-height: 130px;
-            overflow-y: auto;
-            font-size: 19px;
-        }
-
-        .info { font-size: 15px; color: #0a0; margin-top: 15px; }
-    </style>
+#talk:active {
+    transform:scale(0.9);
+    box-shadow:
+        0 0 10px rgba(255,0,0,1),
+        inset 0 0 30px rgba(0,0,0,0.6);
+}
+</style>
 </head>
 
 <body>
 
 <canvas id="matrix"></canvas>
 
-<div class="overlay">
-    <h1>P2P CALL</h1>
+<div class="box">
 
-    <input type="text" id="myId" readonly>
-    <button onclick="copyMyId()" class="small">COPIER MON ID</button>
+<h2>P2P CALL</h2>
 
-    <input type="text" id="friendId" placeholder="ID de l'ami">
-    <button onclick="connectToFriend()" class="small">SE CONNECTER À L'AMI</button>
+<input id="room" placeholder="Code / clé">
+<button onclick="create()">CRÉER</button>
 
-    <div style="margin-top:12px;">Connectés :</div>
-    <div id="connectedList" class="connected-list"></div>
+<input id="myId" readonly placeholder="Ton ID">
 
-    <button id="talkBtn">@</button>
+<input id="friend" placeholder="ID de l'ami">
+<button onclick="connect()">CONNECTER</button>
 
-    <div id="status">En attente...</div>
+<div id="status">En attente...</div>
 
-    <div class="info">
-        Audio P2P - push to talk
-    </div>
+<button id="talk"></button>
+
 </div>
 
 <script>
-/* MATRIX */
-const canvas = document.getElementById('matrix');
-const ctx = canvas.getContext('2d');
-function resize(){ canvas.width = innerWidth; canvas.height = innerHeight; }
-window.addEventListener('resize', resize);
-resize();
+// MATRIX
+const c = document.getElementById("matrix");
+const ctx = c.getContext("2d");
+c.width = innerWidth;
+c.height = innerHeight;
 
-const chars = "01アイウエオカキクケコ0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-let drops = Array(Math.floor(canvas.width / 16)).fill(1);
+let letters = "01P2P".split("");
+let font = 14;
+let cols = c.width / font;
+let drops = [];
 
-setInterval(() => {
-    ctx.fillStyle = 'rgba(0,0,0,0.06)';
-    ctx.fillRect(0,0,canvas.width,canvas.height);
-    ctx.fillStyle = '#0f0';
-    ctx.font = '16px VT323';
+for(let i=0;i<cols;i++) drops[i]=1;
+
+function draw(){
+    ctx.fillStyle="rgba(0,0,0,0.05)";
+    ctx.fillRect(0,0,c.width,c.height);
+
+    ctx.fillStyle="#0f0";
+    ctx.font=font+"px monospace";
 
     for(let i=0;i<drops.length;i++){
-        const t = chars[Math.floor(Math.random()*chars.length)];
-        ctx.fillText(t,i*16,drops[i]*16);
-        if(drops[i]*16>canvas.height && Math.random()>0.975) drops[i]=0;
+        let text = letters[Math.floor(Math.random()*letters.length)];
+        ctx.fillText(text,i*font,drops[i]*font);
+
+        if(drops[i]*font>c.height && Math.random()>0.975) drops[i]=0;
         drops[i]++;
     }
-},35);
+}
+setInterval(draw,33);
 
-/* PEER */
+// PEER
 let peer;
 let connections = [];
-let localStream = null;
-let mediaRecorder;
-let audioChunks = [];
+let stream;
+let recorder;
+let chunks = [];
 
-const myIdEl = document.getElementById('myId');
-const statusEl = document.getElementById('status');
-const talkBtn = document.getElementById('talkBtn');
-const connectedListEl = document.getElementById('connectedList');
+function create(){
+    const room = document.getElementById("room").value.trim();
+    if(!room) return alert("entre un code");
 
-function initPeer(){
-    peer = new Peer();
+    const id = room + "_" + Math.floor(Math.random()*10000);
+    peer = new Peer(id);
 
-    peer.on('open', id => {
-        myIdEl.value = id;
-        statusEl.textContent = "ID prêt";
+    peer.on("open", id=>{
+        document.getElementById("myId").value = id;
+        document.getElementById("status").innerText = "ID prêt";
     });
 
-    peer.on('connection', conn => addConnection(conn));
-}
-
-function addConnection(conn){
-    conn.on('open', () => {
-        connections.push(conn);
-        updateList();
-    });
-
-    conn.on('data', data => {
-        if(data.type === 'audio'){
-            const blob = new Blob([data.blob], {type:'audio/webm'});
-            new Audio(URL.createObjectURL(blob)).play();
-        }
-    });
-
-    conn.on('close', () => {
-        connections = connections.filter(c=>c!==conn);
-        updateList();
+    peer.on("connection", conn=>{
+        setup(conn);
     });
 }
 
-function updateList(){
-    connectedListEl.innerHTML =
-        connections.length ?
-        connections.map(c=>`→ ${c.peer}`).join('<br>') :
-        "Aucun";
-}
+function connect(){
+    const id = document.getElementById("friend").value.trim();
+    if(!id) return;
 
-function copyMyId(){
-    myIdEl.select();
-    document.execCommand('copy');
-    alert("ID copié");
-}
-
-function connectToFriend(){
-    const id = friendId.value.trim();
-    if(!id) return alert("ID manquant");
     const conn = peer.connect(id);
-    addConnection(conn);
+    setup(conn);
 }
 
-/* AUDIO */
-async function startTalking(){
-    if(connections.length===0) return;
+function setup(conn){
+    conn.on("open", ()=>{
+        connections.push(conn);
+        document.getElementById("status").innerText = "connecté ("+connections.length+")";
+    });
 
-    if(!localStream){
-        localStream = await navigator.mediaDevices.getUserMedia({audio:true});
+    conn.on("data", data=>{
+        const blob = new Blob([data], {type:"audio/webm"});
+        new Audio(URL.createObjectURL(blob)).play();
+    });
+}
+
+// TALK BUTTON
+const talk = document.getElementById("talk");
+
+talk.onmousedown = start;
+talk.onmouseup = stop;
+talk.ontouchstart = e=>{e.preventDefault();start()};
+talk.ontouchend = e=>{e.preventDefault();stop()};
+
+async function start(){
+    if(connections.length==0){
+        document.getElementById("status").innerText="connecte toi";
+        return;
     }
 
-    audioChunks = [];
+    if(!stream){
+        stream = await navigator.mediaDevices.getUserMedia({audio:true});
+    }
 
-    mediaRecorder = new MediaRecorder(localStream);
+    chunks=[];
+    recorder = new MediaRecorder(stream);
 
-    mediaRecorder.ondataavailable = e => {
-        if(e.data.size>0) audioChunks.push(e.data);
-    };
-
-    mediaRecorder.start();
+    recorder.ondataavailable = e=>chunks.push(e.data);
+    recorder.start(100);
 }
 
-function stopTalking(){
-    if(!mediaRecorder) return;
+function stop(){
+    if(!recorder) return;
 
-    mediaRecorder.onstop = () => {
-        const blob = new Blob(audioChunks,{type:'audio/webm'});
+    recorder.stop();
 
+    recorder.onstop = ()=>{
+        const blob = new Blob(chunks,{type:"audio/webm"});
         connections.forEach(c=>{
-            if(c.open){
-                c.send({type:'audio', blob});
-            }
+            if(c.open) c.send(blob);
         });
-
-        statusEl.textContent = "Envoyé";
-    };
-
-    mediaRecorder.stop();
+    }
 }
-
-/* ✅ CORRECTION IMPORTANT BOUTON (FIX BUG ANDROID / A7) */
-
-let isTalking = false;
-
-function press(e){
-    e.preventDefault();
-    if(isTalking) return;
-    isTalking = true;
-    startTalking();
-}
-
-function release(e){
-    e.preventDefault();
-    if(!isTalking) return;
-    isTalking = false;
-    stopTalking();
-}
-
-talkBtn.addEventListener('pointerdown', press);
-talkBtn.addEventListener('pointerup', release);
-talkBtn.addEventListener('pointercancel', release);
-talkBtn.addEventListener('pointerleave', release);
-
-/* INIT */
-window.onload = initPeer;
 </script>
 
 </body>
