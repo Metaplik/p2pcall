@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>P2P Call</title>
+    <title>TALKIE-WALKIE MATRIX</title>
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
 
@@ -41,13 +42,11 @@
             padding: 20px 18px;
             box-shadow: 0 0 50px #0f0;
             text-align: center;
+            max-height: 100vh;
+            overflow-y: auto;
         }
 
-        h1 {
-            font-size: 34px;
-            text-shadow: 0 0 15px #0f0;
-            margin-bottom: 8px;
-        }
+        h1 { font-size: 34px; margin-bottom: 8px; }
 
         input {
             width: 100%;
@@ -67,7 +66,6 @@
             padding: 9px 18px;
             margin: 6px;
             font-size: 19px;
-            cursor: pointer;
         }
 
         #talkBtn {
@@ -81,12 +79,13 @@
             color: white;
             font-size: 38px;
             font-weight: bold;
-            cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 10px 25px rgba(255,0,0,0.6), inset 0 8px 15px rgba(255,255,255,0.4);
-            transition: all 0.08s;
+            box-shadow:
+                0 10px 25px rgba(255,0,0,0.6),
+                inset 0 8px 15px rgba(255,255,255,0.4),
+                inset 0 -8px 15px rgba(0,0,0,0.6);
         }
 
         #talkBtn:active {
@@ -96,149 +95,196 @@
             transform: scale(0.96);
         }
 
-        #status {
-            font-size: 22px;
-            min-height: 45px;
-            margin: 12px 0;
-            text-shadow: 0 0 10px #0f0;
+        #status { font-size: 22px; min-height: 45px; }
+
+        .connected-list {
+            background: #111;
+            border: 3px solid #0f0;
+            padding: 10px;
+            max-height: 130px;
+            overflow-y: auto;
+            font-size: 19px;
         }
 
-        .info {
-            font-size: 15px;
-            color: #0a0;
-            margin-top: 15px;
-            line-height: 1.4;
-        }
+        .info { font-size: 15px; color: #0a0; margin-top: 15px; }
     </style>
 </head>
+
 <body>
 
-    <canvas id="matrix"></canvas>
+<canvas id="matrix"></canvas>
 
-    <div class="overlay">
-        <h1>📡 P2P Call</h1>
+<div class="overlay">
+    <h1>P2P CALL</h1>
 
-        <input type="text" id="myId" readonly placeholder="Ton ID">
-        <button onclick="copyMyId()" class="small">COPIER MON ID</button>
+    <input type="text" id="myId" readonly>
+    <button onclick="copyMyId()" class="small">COPIER MON ID</button>
 
-        <input type="text" id="friendId" placeholder="ID de l'ami">
-        <button onclick="connectToFriend()" class="small">SE CONNECTER</button>
+    <input type="text" id="friendId" placeholder="ID de l'ami">
+    <button onclick="connectToFriend()" class="small">SE CONNECTER À L'AMI</button>
 
-        <div id="status">En attente de connexion...</div>
+    <div style="margin-top:12px;">Connectés :</div>
+    <div id="connectedList" class="connected-list"></div>
 
-        <button id="talkBtn">PUSH</button>
+    <button id="talkBtn">PUSH</button>
 
-        <div class="info">
-            • Connexion directe P2P<br>
-            • Idéal pour 2 personnes<br>
-            • Envoie ton ID à ton ami<br>
-            • Maintiens PUSH pour parler
-        </div>
+    <div id="status">En attente...</div>
+
+    <div class="info">
+        Audio P2P - push to talk
     </div>
+</div>
 
-    <script>
-        // MATRIX BACKGROUND
-        const canvas = document.getElementById('matrix');
-        const ctx = canvas.getContext('2d');
-        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
-        window.addEventListener('resize', resize);
-        resize();
+<script>
+/* MATRIX */
+const canvas = document.getElementById('matrix');
+const ctx = canvas.getContext('2d');
+function resize(){ canvas.width = innerWidth; canvas.height = innerHeight; }
+window.addEventListener('resize', resize);
+resize();
 
-        const chars = "01アイウエオカキクケコ0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        const fontSize = 16;
-        let drops = Array(Math.floor(canvas.width / fontSize)).fill(1);
+const chars = "01アイウエオカキクケコ0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+let drops = Array(Math.floor(canvas.width / 16)).fill(1);
 
-        function draw() {
-            ctx.fillStyle = 'rgba(0,0,0,0.06)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = '#0f0';
-            ctx.font = `${fontSize}px VT323`;
-            for (let i = 0; i < drops.length; i++) {
-                const text = chars[Math.floor(Math.random() * chars.length)];
-                ctx.fillText(text, i * fontSize, drops[i] * fontSize);
-                if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0;
-                drops[i]++;
+setInterval(() => {
+    ctx.fillStyle = 'rgba(0,0,0,0.06)';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle = '#0f0';
+    ctx.font = '16px VT323';
+
+    for(let i=0;i<drops.length;i++){
+        const t = chars[Math.floor(Math.random()*chars.length)];
+        ctx.fillText(t,i*16,drops[i]*16);
+        if(drops[i]*16>canvas.height && Math.random()>0.975) drops[i]=0;
+        drops[i]++;
+    }
+},35);
+
+/* PEER */
+let peer;
+let connections = [];
+let localStream = null;
+let mediaRecorder;
+let audioChunks = [];
+
+const myIdEl = document.getElementById('myId');
+const statusEl = document.getElementById('status');
+const talkBtn = document.getElementById('talkBtn');
+const connectedListEl = document.getElementById('connectedList');
+
+function initPeer(){
+    peer = new Peer();
+
+    peer.on('open', id => {
+        myIdEl.value = id;
+        statusEl.textContent = "ID prêt";
+    });
+
+    peer.on('connection', conn => addConnection(conn));
+}
+
+function addConnection(conn){
+    conn.on('open', () => {
+        connections.push(conn);
+        updateList();
+    });
+
+    conn.on('data', data => {
+        if(data.type === 'audio'){
+            const blob = new Blob([data.blob], {type:'audio/webm'});
+            new Audio(URL.createObjectURL(blob)).play();
+        }
+    });
+
+    conn.on('close', () => {
+        connections = connections.filter(c=>c!==conn);
+        updateList();
+    });
+}
+
+function updateList(){
+    connectedListEl.innerHTML =
+        connections.length ?
+        connections.map(c=>`→ ${c.peer}`).join('<br>') :
+        "Aucun";
+}
+
+function copyMyId(){
+    myIdEl.select();
+    document.execCommand('copy');
+    alert("ID copié");
+}
+
+function connectToFriend(){
+    const id = friendId.value.trim();
+    if(!id) return alert("ID manquant");
+    const conn = peer.connect(id);
+    addConnection(conn);
+}
+
+/* AUDIO */
+async function startTalking(){
+    if(connections.length===0) return;
+
+    if(!localStream){
+        localStream = await navigator.mediaDevices.getUserMedia({audio:true});
+    }
+
+    audioChunks = [];
+
+    mediaRecorder = new MediaRecorder(localStream);
+
+    mediaRecorder.ondataavailable = e => {
+        if(e.data.size>0) audioChunks.push(e.data);
+    };
+
+    mediaRecorder.start();
+}
+
+function stopTalking(){
+    if(!mediaRecorder) return;
+
+    mediaRecorder.onstop = () => {
+        const blob = new Blob(audioChunks,{type:'audio/webm'});
+
+        connections.forEach(c=>{
+            if(c.open){
+                c.send({type:'audio', blob});
             }
-        }
-        setInterval(draw, 35);
+        });
 
-        // P2P LOGIC (version améliorée pour le son)
-        let peer;
-        let conn;
-        let localStream = null;
-        let remoteAudio = new Audio();
-        remoteAudio.autoplay = true;
+        statusEl.textContent = "Envoyé";
+    };
 
-        const myIdEl = document.getElementById('myId');
-        const statusEl = document.getElementById('status');
-        const talkBtn = document.getElementById('talkBtn');
+    mediaRecorder.stop();
+}
 
-        function initPeer() {
-            peer = new Peer();
+/* ✅ CORRECTION IMPORTANT BOUTON (FIX BUG ANDROID / A7) */
 
-            peer.on('open', id => {
-                myIdEl.value = id;
-                statusEl.textContent = '✅ ID prêt - Envoie-le à ton ami';
-            });
+let isTalking = false;
 
-            peer.on('connection', incoming => {
-                conn = incoming;
-                setupConnection();
-            });
+function press(e){
+    e.preventDefault();
+    if(isTalking) return;
+    isTalking = true;
+    startTalking();
+}
 
-            peer.on('call', call => {
-                if (!localStream) navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-                    localStream = stream;
-                    call.answer(stream);
-                });
-                call.on('stream', stream => {
-                    remoteAudio.srcObject = stream;
-                });
-            });
-        }
+function release(e){
+    e.preventDefault();
+    if(!isTalking) return;
+    isTalking = false;
+    stopTalking();
+}
 
-        function setupConnection() {
-            conn.on('open', () => {
-                statusEl.textContent = '✅ Connecté ! Maintiens PUSH pour parler';
-            });
-        }
+talkBtn.addEventListener('pointerdown', press);
+talkBtn.addEventListener('pointerup', release);
+talkBtn.addEventListener('pointercancel', release);
+talkBtn.addEventListener('pointerleave', release);
 
-        function copyMyId() {
-            myIdEl.select();
-            document.execCommand('copy');
-            alert('ID copié ! Envoie-le à ton ami');
-        }
+/* INIT */
+window.onload = initPeer;
+</script>
 
-        function connectToFriend() {
-            const id = document.getElementById('friendId').value.trim();
-            if (!id) return alert("Entre l'ID de l'ami");
-            conn = peer.connect(id);
-            setupConnection();
-        }
-
-        async function startTalking() {
-            if (!conn || !conn.open) {
-                statusEl.textContent = '⚠️ Pas encore connecté !';
-                return;
-            }
-            if (!localStream) {
-                localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            }
-            const call = peer.call(conn.peer, localStream);
-            statusEl.textContent = '🔴 TU PARLES...';
-        }
-
-        function stopTalking() {
-            statusEl.textContent = '✅ Connecté - Maintiens PUSH';
-        }
-
-        talkBtn.addEventListener('mousedown', startTalking);
-        talkBtn.addEventListener('mouseup', stopTalking);
-        talkBtn.addEventListener('mouseleave', stopTalking);
-        talkBtn.addEventListener('touchstart', e => { e.preventDefault(); startTalking(); });
-        talkBtn.addEventListener('touchend', e => { e.preventDefault(); stopTalking(); });
-
-        window.onload = initPeer;
-    </script>
 </body>
 </html>
