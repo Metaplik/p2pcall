@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>P2P Call</title>
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            overflow: hidden;
+            background: #000;
+            color: #0f0;
+            font-family: 'VT323', monospace;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            padding: 10px;
+        }
+
+        #matrix {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 1;
+            opacity: 0.85;
+        }
+
+        .overlay {
+            position: relative;
+            z-index: 2;
+            width: 100%;
+            max-width: 360px;
+            background: rgba(10, 10, 10, 0.92);
+            border: 5px solid #0f0;
+            border-radius: 12px;
+            padding: 20px 18px;
+            box-shadow: 0 0 50px #0f0;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 34px;
+            text-shadow: 0 0 15px #0f0;
+            margin-bottom: 8px;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            background: #111;
+            border: 3px solid #0f0;
+            color: #0f0;
+            font-size: 22px;
+            text-align: center;
+        }
+
+        button.small {
+            background: #111;
+            color: #0f0;
+            border: 3px solid #0f0;
+            padding: 9px 18px;
+            margin: 6px;
+            font-size: 19px;
+            cursor: pointer;
+        }
+
+        #talkBtn {
+            width: 100%;
+            max-width: 240px;
+            height: 110px;
+            margin: 25px auto;
+            background: rgba(200, 0, 0, 0.78);
+            border: 6px solid #ddd;
+            border-radius: 12px;
+            color: white;
+            font-size: 38px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 25px rgba(255,0,0,0.6), inset 0 8px 15px rgba(255,255,255,0.4);
+            transition: all 0.08s;
+        }
+
+        #talkBtn:active {
+            background: rgba(0, 255, 0, 0.85);
+            color: #000;
+            border-color: #0f0;
+            transform: scale(0.96);
+        }
+
+        #status {
+            font-size: 22px;
+            min-height: 45px;
+            margin: 12px 0;
+            text-shadow: 0 0 10px #0f0;
+        }
+
+        .info {
+            font-size: 15px;
+            color: #0a0;
+            margin-top: 15px;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="matrix"></canvas>
+
+    <div class="overlay">
+        <h1>📡 P2P Call</h1>
+
+        <input type="text" id="myId" readonly placeholder="Ton ID">
+        <button onclick="copyMyId()" class="small">COPIER MON ID</button>
+
+        <input type="text" id="friendId" placeholder="ID de l'ami">
+        <button onclick="connectToFriend()" class="small">SE CONNECTER</button>
+
+        <div id="status">En attente de connexion...</div>
+
+        <button id="talkBtn">PUSH</button>
+
+        <div class="info">
+            • Connexion directe P2P<br>
+            • Idéal pour 2 personnes<br>
+            • Envoie ton ID à ton ami<br>
+            • Maintiens PUSH pour parler
+        </div>
+    </div>
+
+    <script>
+        // MATRIX BACKGROUND
+        const canvas = document.getElementById('matrix');
+        const ctx = canvas.getContext('2d');
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.addEventListener('resize', resize);
+        resize();
+
+        const chars = "01アイウエオカキクケコ0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        const fontSize = 16;
+        let drops = Array(Math.floor(canvas.width / fontSize)).fill(1);
+
+        function draw() {
+            ctx.fillStyle = 'rgba(0,0,0,0.06)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#0f0';
+            ctx.font = `${fontSize}px VT323`;
+            for (let i = 0; i < drops.length; i++) {
+                const text = chars[Math.floor(Math.random() * chars.length)];
+                ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+                if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0;
+                drops[i]++;
+            }
+        }
+        setInterval(draw, 35);
+
+        // P2P LOGIC (version améliorée pour le son)
+        let peer;
+        let conn;
+        let localStream = null;
+        let remoteAudio = new Audio();
+        remoteAudio.autoplay = true;
+
+        const myIdEl = document.getElementById('myId');
+        const statusEl = document.getElementById('status');
+        const talkBtn = document.getElementById('talkBtn');
+
+        function initPeer() {
+            peer = new Peer();
+
+            peer.on('open', id => {
+                myIdEl.value = id;
+                statusEl.textContent = '✅ ID prêt - Envoie-le à ton ami';
+            });
+
+            peer.on('connection', incoming => {
+                conn = incoming;
+                setupConnection();
+            });
+
+            peer.on('call', call => {
+                if (!localStream) navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+                    localStream = stream;
+                    call.answer(stream);
+                });
+                call.on('stream', stream => {
+                    remoteAudio.srcObject = stream;
+                });
+            });
+        }
+
+        function setupConnection() {
+            conn.on('open', () => {
+                statusEl.textContent = '✅ Connecté ! Maintiens PUSH pour parler';
+            });
+        }
+
+        function copyMyId() {
+            myIdEl.select();
+            document.execCommand('copy');
+            alert('ID copié ! Envoie-le à ton ami');
+        }
+
+        function connectToFriend() {
+            const id = document.getElementById('friendId').value.trim();
+            if (!id) return alert("Entre l'ID de l'ami");
+            conn = peer.connect(id);
+            setupConnection();
+        }
+
+        async function startTalking() {
+            if (!conn || !conn.open) {
+                statusEl.textContent = '⚠️ Pas encore connecté !';
+                return;
+            }
+            if (!localStream) {
+                localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            }
+            const call = peer.call(conn.peer, localStream);
+            statusEl.textContent = '🔴 TU PARLES...';
+        }
+
+        function stopTalking() {
+            statusEl.textContent = '✅ Connecté - Maintiens PUSH';
+        }
+
+        talkBtn.addEventListener('mousedown', startTalking);
+        talkBtn.addEventListener('mouseup', stopTalking);
+        talkBtn.addEventListener('mouseleave', stopTalking);
+        talkBtn.addEventListener('touchstart', e => { e.preventDefault(); startTalking(); });
+        talkBtn.addEventListener('touchend', e => { e.preventDefault(); stopTalking(); });
+
+        window.onload = initPeer;
+    </script>
+</body>
+</html>
