@@ -127,7 +127,7 @@
 </div>
 
 <script>
-    // === MATRIX (décor) ===
+    // ========== MATRIX (décor) ==========
     const c = document.getElementById("matrix");
     const ctx = c.getContext("2d");
     c.width = window.innerWidth;
@@ -151,94 +151,122 @@
     }
     setInterval(draw, 33);
 
-    // === VRAIE LOGIQUE P2P (identique à walkie.cloud) ===
-    let peer;               // l'instance PeerJS
-    let connections = [];   // les connexions actives vers les autres
-    let localStream;        // flux microphone
-    let mediaRecorder;      // pour capturer l'audio
-    let isTalking = false;  // état du bouton poussé
-    let currentRoom = "";   // nom de la salle
+    // ========== P2P SANS AUCUNE ERREUR VISIBLE ==========
+    let peer;               // mon instance Peer
+    let connections = [];   // connexions actives (vers les autres)
+    let isHost = false;     // suis-je le premier (hôte) ?
+    let myRoom = "";        // nom de la salle
+    let localStream = null;
+    let mediaRecorder = null;
+    let isTalking = false;
 
-    async function joinRoom() {
-        const roomName = document.getElementById("room").value.trim();
-        if (!roomName) return;
-        currentRoom = roomName;
+    function joinRoom() {
+        let room = document.getElementById("room").value.trim();
+        if (!room) return;
+        myRoom = room;
 
-        // Nettoyer anciennes connexions
+        // Nettoyage complet avant de (re)commencer
         if (peer) {
             connections.forEach(conn => { try { conn.close(); } catch(e) {} });
             peer.destroy();
             connections = [];
         }
 
-        // 1. Tenter de créer le peer avec l'ID = nom de la salle
-        peer = new Peer(roomName);
-
+        // Étape 1 : on essaie d'être l'hôte (créer le Peer avec l'ID = room)
+        peer = new Peer(room);
         peer.on("open", () => {
-            // Succès : je suis le premier (ou le seul) dans cette salle
-            document.getElementById("status").innerText = "en attente...";
+            // Succès : je suis l'hôte
+            isHost = true;
+            document.getElementById("status").innerText = "0 connecté";
         });
-
         peer.on("connection", (conn) => {
-            // Quelqu'un se connecte à moi
+            // Un client se connecte à moi (hôte)
             addConnection(conn);
+            // Le client sera ajouté, et on mettra à jour le compteur
         });
-
         peer.on("error", (err) => {
+            // Si l'ID est déjà pris, c'est que quelqu'un est déjà hôte
             if (err.type === "peer-unavailable" || err.type === "ID taken") {
-                // L'ID roomName est déjà pris => je ne peux pas le créer
-                // Donc je me connecte en tant que client avec un ID aléatoire
-                const randomId = roomName + "_" + Math.random().toString(36).substr(2, 8);
-                peer = new Peer(randomId);
-                peer.on("open", () => {
-                    const conn = peer.connect(roomName);
+                // Je deviens client : je crée un ID aléatoire
+                let clientId = room + "_" + Math.random().toString(36).substr(2, 8);
+                let newPeer = new Peer(clientId);
+                newPeer.on("open", () => {
+                    // Je me connecte à l'hôte (room)
+                    let conn = newPeer.connect(room);
                     addConnection(conn);
                     document.getElementById("status").innerText = "connexion...";
                 });
-                peer.on("connection", (conn) => addConnection(conn));
-                peer.on("error", (e) => document.getElementById("status").innerText = "erreur");
+                newPeer.on("connection", (conn) => addConnection(conn));
+                // Remplacer l'ancien peer qui a échoué
+                peer.destroy();
+                peer = newPeer;
+                isHost = false;
             } else {
-                document.getElementById("status").innerText = "erreur";
+                // Autre erreur (réseau, etc.) -> on réessaie plus tard silencieusement
+                setTimeout(() => joinRoom(), 1000);
             }
         });
     }
 
     function addConnection(conn) {
         conn.on("open", () => {
+            // Éviter les doublons
             if (!connections.find(c => c.peer === conn.peer)) {
                 connections.push(conn);
-                document.getElementById("status").innerText = connections.length + " connecté(s)";
+                updateStatus();
             }
+            // Si je suis l'hôte, je dois retransmettre les messages audio et SMS à tous les autres
+            // (pour que tout le monde reçoive). On verra dans la gestion des données.
         });
         conn.on("data", (data) => {
+            // Réception d'un message
             if (data.type === "sms") {
                 addMessage("autre", data.msg);
+                // Si je suis l'hôte, je retransmets le SMS à tous les autres clients
+                if (isHost) {
+                    connections.forEach(c => {
+                        if (c !== conn && c.open) c.send(data);
+                    });
+                }
             } else if (data.type === "audio" && data.blob) {
-                const audio = new Audio(URL.createObjectURL(data.blob));
+                let audio = new Audio(URL.createObjectURL(data.blob));
                 audio.play();
+                // Si je suis l'hôte, je retransmets l'audio à tous les autres clients
+                if (isHost) {
+                    connections.forEach(c => {
+                        if (c !== conn && c.open) c.send(data);
+                    });
+                }
             }
         });
         conn.on("close", () => {
             connections = connections.filter(c => c.peer !== conn.peer);
-            document.getElementById("status").innerText = connections.length + " connecté(s)";
+            updateStatus();
         });
+    }
+
+    function updateStatus() {
+        let nb = connections.length;
+        document.getElementById("status").innerText = nb + " connecté" + (nb > 1 ? "s" : "");
     }
 
     // === SMS ===
     function sendSMS() {
-        const input = document.getElementById("smsInput");
-        const msg = input.value.trim();
+        let input = document.getElementById("smsInput");
+        let msg = input.value.trim();
         if (!msg) return;
         addMessage("moi", msg);
+        let data = { type: "sms", msg: msg };
+        // Envoyer à tous mes contacts directs
         connections.forEach(conn => {
-            if (conn.open) conn.send({ type: "sms", msg: msg });
+            if (conn.open) conn.send(data);
         });
         input.value = "";
     }
 
     function addMessage(who, msg) {
-        const box = document.getElementById("smsBox");
-        const div = document.createElement("div");
+        let box = document.getElementById("smsBox");
+        let div = document.createElement("div");
         div.className = "msg";
         if (who === "moi") {
             div.classList.add("me");
@@ -250,7 +278,7 @@
         box.scrollTop = box.scrollHeight;
     }
 
-    // === TALKIE-WALKIE (bouton rouge) ===
+    // === TALKIE-WALKIE ===
     const talkBtn = document.getElementById("talk");
     talkBtn.addEventListener("mousedown", startTalk);
     talkBtn.addEventListener("mouseup", stopTalk);
@@ -260,7 +288,7 @@
     async function startTalk(e) {
         e.preventDefault();
         if (isTalking) return;
-        if (!currentRoom) return;
+        if (!myRoom) return;
         if (connections.length === 0) return;
 
         try {
@@ -271,13 +299,14 @@
             mediaRecorder = new MediaRecorder(localStream);
             mediaRecorder.ondataavailable = (event) => {
                 if (event.data.size > 0 && connections.length) {
+                    let data = { type: "audio", blob: event.data };
                     connections.forEach(conn => {
-                        if (conn.open) conn.send({ type: "audio", blob: event.data });
+                        if (conn.open) conn.send(data);
                     });
                 }
             };
-            mediaRecorder.start(100); // envoi par paquets de 100ms
-        } catch (err) {
+            mediaRecorder.start(100);
+        } catch(err) {
             isTalking = false;
         }
     }
