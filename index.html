@@ -2,329 +2,322 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>CRYPT</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CRYPT - Talkie-Walkie</title>
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+        * { margin:0; padding:0; box-sizing:border-box; }
         body {
-            margin: 0;
-            background: black;
+            overflow: hidden;
+            background: #000;
             color: #0f0;
-            font-family: monospace;
+            font-family: 'VT323', monospace;
+            height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
-            overflow: hidden;
-            padding: 10px;
-            box-sizing: border-box;
-        }
-        canvas {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 0;
-        }
-        * {
-            user-select: none;
-            -webkit-tap-highlight-color: transparent;
-        }
-        .box {
             position: relative;
+            padding: 10px;
+        }
+
+        #matrix {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
             z-index: 1;
+            opacity: 0.85;
+        }
+
+        .overlay {
+            position: relative;
+            z-index: 2;
             width: 100%;
-            max-width: 300px;
-            background: rgba(0,0,0,0.95);
-            border: 2px solid #0f0;
+            max-width: 360px;
+            background: rgba(10, 10, 10, 0.92);
+            border: 5px solid #0f0;
             border-radius: 12px;
-            padding: 12px;
+            padding: 20px 18px;
+            box-shadow: 0 0 50px #0f0;
             text-align: center;
-            box-sizing: border-box;
-        }
-        h2 { margin: 0 0 8px; font-size: 18px; }
-        input, button {
-            width: 100%;
-            height: 40px;
-            margin: 4px 0;
-            padding: 0 8px;
-            background: #111;
-            border: 1.5px solid #0f0;
-            color: #0f0;
-            font-size: 14px;
-            text-align: center;
-            border-radius: 6px;
-            box-sizing: border-box;
-        }
-        #status {
-            margin-top: 6px;
-            font-size: 11px;
-            padding: 3px;
-        }
-        #talk {
-            width: 80px;
-            height: 80px;
-            margin: 10px auto;
-            border-radius: 50%;
-            border: none;
-            cursor: pointer;
-            background: radial-gradient(circle at 30% 30%, #ff4d4d, #cc0000);
-            box-shadow: 0 0 20px rgba(255,0,0,0.6);
-        }
-        #talk:active { transform: scale(0.95); }
-        .sms-area {
-            margin-top: 10px;
-            border-top: 1px solid #0f0;
-            padding-top: 8px;
-        }
-        .sms-box {
-            background: #000;
-            border: 1px solid #0f0;
-            border-radius: 6px;
-            height: 100px;
+            max-height: 100vh;
             overflow-y: auto;
-            padding: 5px;
-            margin-bottom: 6px;
-            text-align: left;
-            font-size: 11px;
         }
-        .sms-input {
+
+        h1 { font-size: 34px; margin-bottom: 8px; }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            background: #111;
+            border: 3px solid #0f0;
+            color: #0f0;
+            font-size: 22px;
+            text-align: center;
+        }
+
+        button.small {
+            background: #111;
+            color: #0f0;
+            border: 3px solid #0f0;
+            padding: 9px 18px;
+            margin: 6px;
+            font-size: 19px;
+        }
+
+        #talkBtn {
+            width: 100%;
+            max-width: 240px;
+            height: 110px;
+            margin: 25px auto;
+            background: rgba(200, 0, 0, 0.78);
+            border: 6px solid #ddd;
+            border-radius: 12px;
+            color: white;
+            font-size: 38px;
+            font-weight: bold;
             display: flex;
-            gap: 5px;
+            align-items: center;
+            justify-content: center;
+            box-shadow:
+                0 10px 25px rgba(255,0,0,0.6),
+                inset 0 8px 15px rgba(255,255,255,0.4),
+                inset 0 -8px 15px rgba(0,0,0,0.6);
         }
-        .sms-input input {
-            flex: 1;
-            height: 35px;
-            font-size: 12px;
-            margin: 0;
+
+        #talkBtn:active {
+            background: rgba(0, 255, 0, 0.85);
+            color: #000;
+            border-color: #0f0;
+            transform: scale(0.96);
         }
-        .sms-input button {
-            width: 55px;
-            height: 35px;
-            margin: 0;
+
+        #status { font-size: 22px; min-height: 45px; }
+
+        .connected-list {
+            background: #111;
+            border: 3px solid #0f0;
+            padding: 10px;
+            max-height: 130px;
+            overflow-y: auto;
+            font-size: 19px;
         }
-        .msg { margin-bottom: 4px; word-wrap: break-word; }
-        .msg span { color: #ff0; }
-        .msg.me { color: #0f0; }
+
+        .info { font-size: 15px; color: #0a0; margin-top: 15px; }
     </style>
 </head>
 <body>
+
 <canvas id="matrix"></canvas>
-<div class="box">
-    <h2>CRYPT</h2>
-    <input id="room" placeholder="code">
-    <button onclick="joinRoom()">ENTRER</button>
-    <div id="status"></div>
-    <div class="sms-area">
-        <div class="sms-box" id="smsBox"></div>
-        <div class="sms-input">
-            <input type="text" id="smsInput" placeholder="message">
-            <button onclick="sendSMS()">OK</button>
-        </div>
+
+<div class="overlay">
+    <h1>CRYPT</h1>
+
+    <!-- Nouveau : champ pour le nom de la salle -->
+    <input type="text" id="roomName" placeholder="Nom de la salle (ex: toto)">
+    <button onclick="joinRoom()" class="small">REJOINDRE</button>
+
+    <div style="margin-top:12px;">Connectés :</div>
+    <div id="connectedList" class="connected-list"></div>
+
+    <button id="talkBtn">🎤</button>
+
+    <div id="status">Prêt</div>
+
+    <div class="info">
+        Talkie-Walkie - Maintiens le bouton pour parler
     </div>
-    <button id="talk"></button>
 </div>
 
 <script>
-    // ========== MATRIX (décor) ==========
-    const c = document.getElementById("matrix");
-    const ctx = c.getContext("2d");
-    c.width = window.innerWidth;
-    c.height = window.innerHeight;
-    let letters = "01CRYPT".split("");
-    let font = 12;
-    let cols = Math.floor(c.width / font);
-    let drops = [];
-    for (let i = 0; i < cols; i++) drops[i] = 1;
-    function draw() {
-        ctx.fillStyle = "rgba(0,0,0,0.05)";
-        ctx.fillRect(0, 0, c.width, c.height);
-        ctx.fillStyle = "#0f0";
-        ctx.font = font + "px monospace";
-        for (let i = 0; i < drops.length; i++) {
-            let text = letters[Math.floor(Math.random() * letters.length)];
-            ctx.fillText(text, i * font, drops[i] * font);
-            if (drops[i] * font > c.height && Math.random() > 0.975) drops[i] = 0;
-            drops[i]++;
-        }
+/* MATRIX (identique) */
+const canvas = document.getElementById('matrix');
+const ctx = canvas.getContext('2d');
+function resize(){ canvas.width = innerWidth; canvas.height = innerHeight; }
+window.addEventListener('resize', resize);
+resize();
+
+const chars = "01アイウエオカキクケコ0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+let drops = Array(Math.floor(canvas.width / 16)).fill(1);
+
+setInterval(() => {
+    ctx.fillStyle = 'rgba(0,0,0,0.06)';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle = '#0f0';
+    ctx.font = '16px VT323';
+
+    for(let i=0;i<drops.length;i++){
+        const t = chars[Math.floor(Math.random()*chars.length)];
+        ctx.fillText(t,i*16,drops[i]*16);
+        if(drops[i]*16>canvas.height && Math.random()>0.975) drops[i]=0;
+        drops[i]++;
     }
-    setInterval(draw, 33);
+},35);
 
-    // ========== P2P SANS AUCUNE ERREUR VISIBLE ==========
-    let peer;               // mon instance Peer
-    let connections = [];   // connexions actives (vers les autres)
-    let isHost = false;     // suis-je le premier (hôte) ?
-    let myRoom = "";        // nom de la salle
-    let localStream = null;
-    let mediaRecorder = null;
-    let isTalking = false;
+/* ========== NOUVELLE LOGIQUE PAR SALLE (sans erreur visible) ========== */
+let peer;               // instance PeerJS
+let connections = [];   // liste des connexions actives
+let localStream = null;
+let mediaRecorder;
+let audioChunks = [];
+let isHost = false;     // savoir si on est l'hôte (pour retransmettre)
 
-    function joinRoom() {
-        let room = document.getElementById("room").value.trim();
-        if (!room) return;
-        myRoom = room;
+const statusEl = document.getElementById('status');
+const connectedListEl = document.getElementById('connectedList');
+const talkBtn = document.getElementById('talkBtn');
 
-        // Nettoyage complet avant de (re)commencer
-        if (peer) {
-            connections.forEach(conn => { try { conn.close(); } catch(e) {} });
-            peer.destroy();
-            connections = [];
-        }
+function joinRoom() {
+    const room = document.getElementById('roomName').value.trim();
+    if (!room) return;
 
-        // Étape 1 : on essaie d'être l'hôte (créer le Peer avec l'ID = room)
-        peer = new Peer(room);
-        peer.on("open", () => {
-            // Succès : je suis l'hôte
-            isHost = true;
-            document.getElementById("status").innerText = "0 connecté";
-        });
-        peer.on("connection", (conn) => {
-            // Un client se connecte à moi (hôte)
-            addConnection(conn);
-            // Le client sera ajouté, et on mettra à jour le compteur
-        });
-        peer.on("error", (err) => {
-            // Si l'ID est déjà pris, c'est que quelqu'un est déjà hôte
-            if (err.type === "peer-unavailable" || err.type === "ID taken") {
-                // Je deviens client : je crée un ID aléatoire
-                let clientId = room + "_" + Math.random().toString(36).substr(2, 8);
-                let newPeer = new Peer(clientId);
-                newPeer.on("open", () => {
-                    // Je me connecte à l'hôte (room)
-                    let conn = newPeer.connect(room);
-                    addConnection(conn);
-                    document.getElementById("status").innerText = "connexion...";
-                });
-                newPeer.on("connection", (conn) => addConnection(conn));
-                // Remplacer l'ancien peer qui a échoué
-                peer.destroy();
-                peer = newPeer;
-                isHost = false;
-            } else {
-                // Autre erreur (réseau, etc.) -> on réessaie plus tard silencieusement
-                setTimeout(() => joinRoom(), 1000);
-            }
-        });
+    // Fermer l'ancien réseau
+    if (peer) {
+        connections.forEach(conn => { try { conn.close(); } catch(e) {} });
+        peer.destroy();
+        connections = [];
     }
 
-    function addConnection(conn) {
-        conn.on("open", () => {
-            // Éviter les doublons
-            if (!connections.find(c => c.peer === conn.peer)) {
-                connections.push(conn);
-                updateStatus();
-            }
-            // Si je suis l'hôte, je dois retransmettre les messages audio et SMS à tous les autres
-            // (pour que tout le monde reçoive). On verra dans la gestion des données.
-        });
-        conn.on("data", (data) => {
-            // Réception d'un message
-            if (data.type === "sms") {
-                addMessage("autre", data.msg);
-                // Si je suis l'hôte, je retransmets le SMS à tous les autres clients
-                if (isHost) {
-                    connections.forEach(c => {
-                        if (c !== conn && c.open) c.send(data);
-                    });
-                }
-            } else if (data.type === "audio" && data.blob) {
-                let audio = new Audio(URL.createObjectURL(data.blob));
-                audio.play();
-                // Si je suis l'hôte, je retransmets l'audio à tous les autres clients
-                if (isHost) {
-                    connections.forEach(c => {
-                        if (c !== conn && c.open) c.send(data);
-                    });
-                }
-            }
-        });
-        conn.on("close", () => {
-            connections = connections.filter(c => c.peer !== conn.peer);
-            updateStatus();
-        });
-    }
-
-    function updateStatus() {
-        let nb = connections.length;
-        document.getElementById("status").innerText = nb + " connecté" + (nb > 1 ? "s" : "");
-    }
-
-    // === SMS ===
-    function sendSMS() {
-        let input = document.getElementById("smsInput");
-        let msg = input.value.trim();
-        if (!msg) return;
-        addMessage("moi", msg);
-        let data = { type: "sms", msg: msg };
-        // Envoyer à tous mes contacts directs
-        connections.forEach(conn => {
-            if (conn.open) conn.send(data);
-        });
-        input.value = "";
-    }
-
-    function addMessage(who, msg) {
-        let box = document.getElementById("smsBox");
-        let div = document.createElement("div");
-        div.className = "msg";
-        if (who === "moi") {
-            div.classList.add("me");
-            div.innerHTML = `<span>moi:</span> ${msg}`;
-        } else {
-            div.innerHTML = `<span>autre:</span> ${msg}`;
-        }
-        box.appendChild(div);
-        box.scrollTop = box.scrollHeight;
-    }
-
-    // === TALKIE-WALKIE ===
-    const talkBtn = document.getElementById("talk");
-    talkBtn.addEventListener("mousedown", startTalk);
-    talkBtn.addEventListener("mouseup", stopTalk);
-    talkBtn.addEventListener("touchstart", startTalk);
-    talkBtn.addEventListener("touchend", stopTalk);
-
-    async function startTalk(e) {
-        e.preventDefault();
-        if (isTalking) return;
-        if (!myRoom) return;
-        if (connections.length === 0) return;
-
-        try {
-            if (!localStream) {
-                localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            }
-            isTalking = true;
-            mediaRecorder = new MediaRecorder(localStream);
-            mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0 && connections.length) {
-                    let data = { type: "audio", blob: event.data };
-                    connections.forEach(conn => {
-                        if (conn.open) conn.send(data);
-                    });
-                }
-            };
-            mediaRecorder.start(100);
-        } catch(err) {
-            isTalking = false;
-        }
-    }
-
-    function stopTalk(e) {
-        e.preventDefault();
-        if (!isTalking) return;
-        if (mediaRecorder && mediaRecorder.state === "recording") {
-            mediaRecorder.stop();
-        }
-        isTalking = false;
-    }
-
-    // Nettoyage à la fermeture
-    window.addEventListener("beforeunload", () => {
-        if (localStream) localStream.getTracks().forEach(t => t.stop());
-        if (peer) peer.destroy();
+    // Étape 1 : tenter de créer le peer avec l'ID = nom de la salle
+    peer = new Peer(room);
+    peer.on('open', () => {
+        // Succès : je suis l'hôte
+        isHost = true;
+        statusEl.textContent = "Hôte - en attente...";
+        updateList();
     });
+    peer.on('connection', (conn) => {
+        // Quelqu'un se connecte à moi (hôte)
+        addConnection(conn);
+    });
+    peer.on('error', (err) => {
+        // Si l'ID est déjà pris, je deviens client
+        if (err.type === 'peer-unavailable' || err.type === 'ID taken') {
+            // Créer un ID aléatoire pour moi
+            const clientId = room + '_' + Math.random().toString(36).substr(2, 8);
+            const newPeer = new Peer(clientId);
+            newPeer.on('open', () => {
+                // Me connecter à l'hôte
+                const conn = newPeer.connect(room);
+                addConnection(conn);
+                statusEl.textContent = "Client - connexion...";
+                updateList();
+            });
+            newPeer.on('connection', (conn) => addConnection(conn));
+            // Remplacer l'ancien peer
+            peer.destroy();
+            peer = newPeer;
+            isHost = false;
+        } else {
+            // Autres erreurs (réseau) : on réessaie silencieusement après 2 secondes
+            setTimeout(() => joinRoom(), 2000);
+        }
+    });
+}
+
+function addConnection(conn) {
+    conn.on('open', () => {
+        if (!connections.find(c => c.peer === conn.peer)) {
+            connections.push(conn);
+            updateList();
+            statusEl.textContent = connections.length + " connecté" + (connections.length > 1 ? "s" : "");
+        }
+    });
+    conn.on('data', (data) => {
+        if (data.type === 'audio') {
+            // Lecture du son reçu
+            const blob = new Blob([data.blob], {type: 'audio/webm'});
+            const audio = new Audio(URL.createObjectURL(blob));
+            audio.play();
+
+            // Si je suis l'hôte, je retransmets ce son à tous les autres clients
+            if (isHost) {
+                connections.forEach(c => {
+                    if (c !== conn && c.open) {
+                        c.send({ type: 'audio', blob: data.blob });
+                    }
+                });
+            }
+        }
+    });
+    conn.on('close', () => {
+        connections = connections.filter(c => c !== conn);
+        updateList();
+        statusEl.textContent = connections.length + " connecté" + (connections.length > 1 ? "s" : "");
+    });
+}
+
+function updateList() {
+    if (connections.length === 0) {
+        connectedListEl.innerHTML = "Aucun";
+    } else {
+        connectedListEl.innerHTML = connections.map(c => `→ ${c.peer}`).join('<br>');
+    }
+}
+
+/* ========== AUDIO (push to talk) ========== */
+async function startTalking() {
+    if (connections.length === 0) {
+        statusEl.textContent = "Personne connecté";
+        return;
+    }
+    if (!localStream) {
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch(e) {
+            statusEl.textContent = "Micro inaccessible";
+            return;
+        }
+    }
+    audioChunks = [];
+    mediaRecorder = new MediaRecorder(localStream);
+    mediaRecorder.ondataavailable = e => {
+        if (e.data.size > 0) audioChunks.push(e.data);
+    };
+    mediaRecorder.start();
+}
+
+function stopTalking() {
+    if (!mediaRecorder) return;
+    mediaRecorder.onstop = () => {
+        const blob = new Blob(audioChunks, { type: 'audio/webm' });
+        // Envoyer à toutes les connexions
+        connections.forEach(conn => {
+            if (conn.open) {
+                conn.send({ type: 'audio', blob: blob });
+            }
+        });
+        statusEl.textContent = "Message audio envoyé";
+    };
+    mediaRecorder.stop();
+}
+
+/* Gestion du bouton (souris et tactile) */
+let isTalking = false;
+function press(e) {
+    e.preventDefault();
+    if (isTalking) return;
+    isTalking = true;
+    startTalking();
+}
+function release(e) {
+    e.preventDefault();
+    if (!isTalking) return;
+    isTalking = false;
+    stopTalking();
+}
+talkBtn.addEventListener('pointerdown', press);
+talkBtn.addEventListener('pointerup', release);
+talkBtn.addEventListener('pointercancel', release);
+talkBtn.addEventListener('pointerleave', release);
+
+// Nettoyage à la fermeture
+window.addEventListener('beforeunload', () => {
+    if (localStream) localStream.getTracks().forEach(t => t.stop());
+    if (peer) peer.destroy();
+});
 </script>
 </body>
 </html>
