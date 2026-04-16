@@ -116,14 +116,13 @@
 <div class="overlay">
     <h1>CRYPT</h1>
 
-    <!-- Nouveau : champ pour le nom de la salle -->
     <input type="text" id="roomName" placeholder="Nom de la salle (ex: toto)">
     <button onclick="joinRoom()" class="small">REJOINDRE</button>
 
     <div style="margin-top:12px;">Connectés :</div>
     <div id="connectedList" class="connected-list"></div>
 
-    <button id="talkBtn">🎤</button>
+    <button id="talkBtn"></button>
 
     <div id="status">Prêt</div>
 
@@ -133,7 +132,7 @@
 </div>
 
 <script>
-/* MATRIX (identique) */
+// MATRIX - inchangé
 const canvas = document.getElementById('matrix');
 const ctx = canvas.getContext('2d');
 function resize(){ canvas.width = innerWidth; canvas.height = innerHeight; }
@@ -157,13 +156,13 @@ setInterval(() => {
     }
 },35);
 
-/* ========== NOUVELLE LOGIQUE PAR SALLE (sans erreur visible) ========== */
-let peer;               // instance PeerJS
-let connections = [];   // liste des connexions actives
+// ====================== LOGIQUE ======================
+let peer;
+let connections = [];
 let localStream = null;
 let mediaRecorder;
 let audioChunks = [];
-let isHost = false;     // savoir si on est l'hôte (pour retransmettre)
+let isHost = false;
 
 const statusEl = document.getElementById('status');
 const connectedListEl = document.getElementById('connectedList');
@@ -171,48 +170,45 @@ const talkBtn = document.getElementById('talkBtn');
 
 function joinRoom() {
     const room = document.getElementById('roomName').value.trim();
-    if (!room) return;
+    if (!room) return statusEl.textContent = "Entre un nom de salle";
 
-    // Fermer l'ancien réseau
     if (peer) {
-        connections.forEach(conn => { try { conn.close(); } catch(e) {} });
+        connections.forEach(conn => { try { conn.close(); } catch(e){} });
         peer.destroy();
         connections = [];
     }
 
-    // Étape 1 : tenter de créer le peer avec l'ID = nom de la salle
-    peer = new Peer(room);
+    statusEl.textContent = "Connexion...";
+
+    peer = new Peer(room, {
+        debug: 2,
+        config: {
+            iceServers: [
+                { urls: "stun:stun.l.google.com:19302" },
+                { urls: "stun:stun1.l.google.com:19302" }
+            ]
+        }
+    });
+
     peer.on('open', () => {
-        // Succès : je suis l'hôte
         isHost = true;
-        statusEl.textContent = "Hôte - en attente...";
-        updateList();
+        statusEl.textContent = `Hôte - Salle "${room}"`;
     });
-    peer.on('connection', (conn) => {
-        // Quelqu'un se connecte à moi (hôte)
-        addConnection(conn);
-    });
+
+    peer.on('connection', (conn) => addConnection(conn));
+
     peer.on('error', (err) => {
-        // Si l'ID est déjà pris, je deviens client
-        if (err.type === 'peer-unavailable' || err.type === 'ID taken') {
-            // Créer un ID aléatoire pour moi
-            const clientId = room + '_' + Math.random().toString(36).substr(2, 8);
-            const newPeer = new Peer(clientId);
-            newPeer.on('open', () => {
-                // Me connecter à l'hôte
-                const conn = newPeer.connect(room);
+        console.error(err);
+        if (err.type === 'unavailable-id') {
+            statusEl.textContent = "Salle prise → mode client";
+            const clientId = room + '_' + Math.random().toString(36).substr(2,8);
+            peer = new Peer(clientId, { debug: 2 });
+            peer.on('open', () => {
+                const conn = peer.connect(room);
                 addConnection(conn);
-                statusEl.textContent = "Client - connexion...";
-                updateList();
             });
-            newPeer.on('connection', (conn) => addConnection(conn));
-            // Remplacer l'ancien peer
-            peer.destroy();
-            peer = newPeer;
-            isHost = false;
         } else {
-            // Autres erreurs (réseau) : on réessaie silencieusement après 2 secondes
-            setTimeout(() => joinRoom(), 2000);
+            statusEl.textContent = "Erreur : " + err.type;
         }
     });
 }
@@ -225,95 +221,69 @@ function addConnection(conn) {
             statusEl.textContent = connections.length + " connecté" + (connections.length > 1 ? "s" : "");
         }
     });
+
     conn.on('data', (data) => {
-        if (data.type === 'audio') {
-            // Lecture du son reçu
+        if (data.type === 'audio' && data.blob) {
             const blob = new Blob([data.blob], {type: 'audio/webm'});
             const audio = new Audio(URL.createObjectURL(blob));
             audio.play();
 
-            // Si je suis l'hôte, je retransmets ce son à tous les autres clients
             if (isHost) {
                 connections.forEach(c => {
-                    if (c !== conn && c.open) {
-                        c.send({ type: 'audio', blob: data.blob });
-                    }
+                    if (c !== conn && c.open) c.send(data);
                 });
             }
         }
     });
+
     conn.on('close', () => {
         connections = connections.filter(c => c !== conn);
         updateList();
-        statusEl.textContent = connections.length + " connecté" + (connections.length > 1 ? "s" : "");
     });
 }
 
 function updateList() {
-    if (connections.length === 0) {
-        connectedListEl.innerHTML = "Aucun";
-    } else {
-        connectedListEl.innerHTML = connections.map(c => `→ ${c.peer}`).join('<br>');
-    }
+    connectedListEl.innerHTML = connections.length === 0 ? "Aucun" : connections.map(c => `→ ${c.peer}`).join('<br>');
 }
 
-/* ========== AUDIO (push to talk) ========== */
+// Push to talk
 async function startTalking() {
-    if (connections.length === 0) {
-        statusEl.textContent = "Personne connecté";
-        return;
-    }
+    if (connections.length === 0) return statusEl.textContent = "Personne connecté";
     if (!localStream) {
         try {
             localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         } catch(e) {
-            statusEl.textContent = "Micro inaccessible";
-            return;
+            return statusEl.textContent = "Micro inaccessible";
         }
     }
     audioChunks = [];
-    mediaRecorder = new MediaRecorder(localStream);
-    mediaRecorder.ondataavailable = e => {
-        if (e.data.size > 0) audioChunks.push(e.data);
-    };
-    mediaRecorder.start();
+    mediaRecorder = new MediaRecorder(localStream, { mimeType: 'audio/webm' });
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+    mediaRecorder.start(100);
 }
 
 function stopTalking() {
     if (!mediaRecorder) return;
     mediaRecorder.onstop = () => {
+        if (audioChunks.length === 0) return;
         const blob = new Blob(audioChunks, { type: 'audio/webm' });
-        // Envoyer à toutes les connexions
         connections.forEach(conn => {
-            if (conn.open) {
-                conn.send({ type: 'audio', blob: blob });
-            }
+            if (conn.open) conn.send({ type: 'audio', blob: blob });
         });
-        statusEl.textContent = "Message audio envoyé";
+        statusEl.textContent = "Envoyé";
     };
     mediaRecorder.stop();
 }
 
-/* Gestion du bouton (souris et tactile) */
 let isTalking = false;
-function press(e) {
-    e.preventDefault();
-    if (isTalking) return;
-    isTalking = true;
-    startTalking();
-}
-function release(e) {
-    e.preventDefault();
-    if (!isTalking) return;
-    isTalking = false;
-    stopTalking();
-}
+function press(e) { e.preventDefault(); if (!isTalking) { isTalking = true; startTalking(); } }
+function release(e) { e.preventDefault(); if (isTalking) { isTalking = false; stopTalking(); } }
+
 talkBtn.addEventListener('pointerdown', press);
 talkBtn.addEventListener('pointerup', release);
-talkBtn.addEventListener('pointercancel', release);
 talkBtn.addEventListener('pointerleave', release);
+talkBtn.addEventListener('pointercancel', release);
 
-// Nettoyage à la fermeture
 window.addEventListener('beforeunload', () => {
     if (localStream) localStream.getTracks().forEach(t => t.stop());
     if (peer) peer.destroy();
