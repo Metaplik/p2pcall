@@ -84,6 +84,7 @@ input, button {
     cursor:pointer;
     background:radial-gradient(circle at 30% 30%, #ff4d4d, #cc0000);
     box-shadow: 0 0 20px rgba(255,0,0,0.6), inset 0 0 15px rgba(255,255,255,0.2);
+    transition: transform 0.05s;
 }
 
 #talk:active {
@@ -170,6 +171,7 @@ input, button {
 </div>
 
 <script>
+// MATRIX
 const c = document.getElementById("matrix");
 const ctx = c.getContext("2d");
 c.width = window.innerWidth;
@@ -198,101 +200,167 @@ function draw(){
 }
 setInterval(draw,33);
 
-let peer;
-let connections = [];
+// VARIABLES
+let localPeer;
+let remotePeers = [];
 let currentRoom = null;
-let stream = null;
+let localStream = null;
 let mediaRecorder = null;
-let isTalking = false;
+let isPttActive = false;
+let audioContext = null;
 
+// FONCTION POUR JOUER LE SON DU TALKIE-WALKIE
+function playTalkieSound(type) {
+    try {
+        if (!audioContext) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        if (type === 'start') {
+            oscillator.frequency.value = 880;
+            gainNode.gain.value = 0.3;
+            oscillator.start();
+            gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.1);
+            oscillator.stop(audioContext.currentTime + 0.1);
+        } else if (type === 'stop') {
+            oscillator.frequency.value = 440;
+            gainNode.gain.value = 0.3;
+            oscillator.start();
+            gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.1);
+            oscillator.stop(audioContext.currentTime + 0.1);
+        }
+    } catch(e) {}
+}
+
+// REJOINDRE UNE COLLECTION
 function joinRoom() {
     const roomInput = document.getElementById("room");
     const roomName = roomInput.value.trim();
     
     if (!roomName) return;
     
-    if (peer) {
-        connections.forEach(conn => {
+    // Fermer anciennes connexions
+    if (localPeer) {
+        remotePeers.forEach(conn => {
             if (conn && conn.close) conn.close();
         });
-        connections = [];
-        peer.destroy();
+        remotePeers = [];
+        localPeer.destroy();
     }
     
     currentRoom = roomName;
     
-    const peerId = roomName + "_" + Math.random().toString(36).substr(2, 6);
+    // Créer un ID unique pour ce peer
+    const randomId = Math.random().toString(36).substr(2, 8);
+    localPeer = new Peer(randomId);
     
-    peer = new Peer(peerId);
-    
-    peer.on('open', () => {
+    localPeer.on('open', () => {
         document.getElementById("status").innerText = "connecté";
         
-        setTimeout(() => {
-            connectToRoom(roomName);
-        }, 500);
+        // Stocker l'ID dans localStorage pour que les autres puissent nous trouver
+        localStorage.setItem('crypt_room_' + roomName, randomId);
+        
+        // Chercher les autres dans la même room
+        searchForPeers(roomName);
     });
     
-    peer.on('connection', (conn) => {
-        handleNewConnection(conn);
+    localPeer.on('connection', (conn) => {
+        addConnection(conn);
     });
     
-    peer.on('error', (err) => {
-        if (err.type === 'peer-unavailable') {
-            document.getElementById("status").innerText = "erreur";
-        }
+    localPeer.on('error', (err) => {
+        document.getElementById("status").innerText = "erreur";
     });
 }
 
-function connectToRoom(roomName) {
+// CHERCHER LES AUTRES PEERS
+function searchForPeers(roomName) {
+    // Récupérer tous les IDs stockés pour cette room
+    const storedIds = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('crypt_room_' + roomName)) {
+            const id = localStorage.getItem(key);
+            if (id && id !== localPeer.id) {
+                storedIds.push(id);
+            }
+        }
+    }
+    
+    // Essayer de se connecter à chaque ID trouvé
+    storedIds.forEach(peerId => {
+        setTimeout(() => {
+            if (localPeer && peerId !== localPeer.id) {
+                const conn = localPeer.connect(peerId);
+                if (conn) {
+                    addConnection(conn);
+                }
+            }
+        }, 100);
+    });
+    
+    // Mettre à jour le statut
     setTimeout(() => {
-        if (connections.length === 0) {
-            document.getElementById("status").innerText = "en attente";
+        if (remotePeers.length === 0) {
+            document.getElementById("status").innerText = "seul";
+        } else {
+            document.getElementById("status").innerText = remotePeers.length + " connecté(s)";
         }
     }, 1000);
 }
 
-function handleNewConnection(conn) {
+// AJOUTER UNE CONNEXION
+function addConnection(conn) {
+    // Éviter les doublons
+    if (remotePeers.some(c => c.peer === conn.peer)) return;
+    
     conn.on('open', () => {
-        const exists = connections.some(c => c.peer === conn.peer);
-        if (!exists) {
-            connections.push(conn);
-            document.getElementById("status").innerText = connections.length + " connecté(s)";
-        }
+        remotePeers.push(conn);
+        document.getElementById("status").innerText = remotePeers.length + " connecté(s)";
         
-        setupConnection(conn);
+        // Envoyer notre ID pour la découverte mutuelle
+        conn.send({
+            type: 'peer_id',
+            id: localPeer.id
+        });
     });
     
-    conn.on('close', () => {
-        const index = connections.findIndex(c => c.peer === conn.peer);
-        if (index !== -1) {
-            connections.splice(index, 1);
-            document.getElementById("status").innerText = connections.length + " connecté(s)";
-        }
-    });
-}
-
-function setupConnection(conn) {
     conn.on('data', (data) => {
         if (data.type === 'sms') {
             addSMS("autre", data.message);
         } else if (data.type === 'audio' && data.blob) {
             playAudio(data.blob);
+        } else if (data.type === 'peer_id') {
+            // Stocker l'ID de l'autre peer
+            localStorage.setItem('crypt_room_' + currentRoom + '_peer', data.id);
+        }
+    });
+    
+    conn.on('close', () => {
+        const index = remotePeers.findIndex(c => c.peer === conn.peer);
+        if (index !== -1) {
+            remotePeers.splice(index, 1);
+            document.getElementById("status").innerText = remotePeers.length + " connecté(s)";
         }
     });
 }
 
+// ENVOYER SMS
 function sendSMS() {
     const input = document.getElementById("smsInput");
     const message = input.value.trim();
     
-    if (!message) return;
-    
-    if (!currentRoom) return;
+    if (!message || !currentRoom) return;
     
     addSMS("moi", message);
     
-    connections.forEach(conn => {
+    remotePeers.forEach(conn => {
         if (conn.open) {
             conn.send({
                 type: 'sms',
@@ -304,6 +372,7 @@ function sendSMS() {
     input.value = "";
 }
 
+// AFFICHER SMS
 function addSMS(sender, message) {
     const box = document.getElementById("smsBox");
     const div = document.createElement("div");
@@ -318,6 +387,7 @@ function addSMS(sender, message) {
     box.scrollTop = box.scrollHeight;
 }
 
+// TALKIE-WALKIE
 const talkButton = document.getElementById("talk");
 
 talkButton.addEventListener("touchstart", startTalking);
@@ -327,21 +397,31 @@ talkButton.addEventListener("mouseup", stopTalking);
 
 async function startTalking(e) {
     e.preventDefault();
-    if (isTalking) return;
-    
+    if (isPttActive) return;
     if (!currentRoom) return;
     
+    // Jouer le son du talkie-walkie (début)
+    playTalkieSound('start');
+    
     try {
-        if (!stream) {
-            stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        if (!localStream) {
+            localStream = await navigator.mediaDevices.getUserMedia({ 
+                audio: {
+                    echoCancellation: false,
+                    noiseSuppression: false,
+                    autoGainControl: false
+                }
+            });
         }
         
-        isTalking = true;
-        mediaRecorder = new MediaRecorder(stream);
+        isPttActive = true;
+        mediaRecorder = new MediaRecorder(localStream, {
+            mimeType: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
+        });
         
         mediaRecorder.ondataavailable = (event) => {
-            if (event.data.size > 0 && connections.length > 0) {
-                connections.forEach(conn => {
+            if (event.data.size > 0 && remotePeers.length > 0) {
+                remotePeers.forEach(conn => {
                     if (conn.open) {
                         conn.send({
                             type: 'audio',
@@ -352,24 +432,28 @@ async function startTalking(e) {
             }
         };
         
-        mediaRecorder.start(100);
+        mediaRecorder.start(50);
         
     } catch (err) {
-        isTalking = false;
+        isPttActive = false;
     }
 }
 
 function stopTalking(e) {
     e.preventDefault();
-    if (!isTalking) return;
+    if (!isPttActive) return;
     
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
         mediaRecorder.stop();
     }
     
-    isTalking = false;
+    isPttActive = false;
+    
+    // Jouer le son du talkie-walkie (fin)
+    playTalkieSound('stop');
 }
 
+// LIRE L'AUDIO REÇU
 function playAudio(blob) {
     try {
         const audioUrl = URL.createObjectURL(blob);
@@ -379,12 +463,13 @@ function playAudio(blob) {
     } catch (err) {}
 }
 
+// NETTOYAGE
 window.addEventListener('beforeunload', () => {
-    if (peer) {
-        peer.destroy();
+    if (localPeer) {
+        localPeer.destroy();
     }
-    if (stream) {
-        stream.getTracks().forEach(track => track.stop());
+    if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
     }
 });
 </script>
