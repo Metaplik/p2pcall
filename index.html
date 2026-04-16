@@ -22,6 +22,7 @@ body {
     box-sizing:border-box;
 }
 
+/* MATRIX */
 canvas {
     position:fixed;
     top:0;
@@ -31,6 +32,14 @@ canvas {
     z-index:0;
 }
 
+/* 🔥 FIX ANDROID (sans toucher design) */
+* {
+    -webkit-user-select:none;
+    user-select:none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* BOX */
 .box {
     position:relative;
     z-index:1;
@@ -44,7 +53,10 @@ canvas {
     box-sizing:border-box;
 }
 
-h2 { margin:0 0 8px; font-size:18px; }
+h2 {
+    margin:0 0 8px;
+    font-size:18px;
+}
 
 input, button {
     width:100%;
@@ -60,12 +72,14 @@ input, button {
     box-sizing:border-box;
 }
 
+/* STATUS */
 #status {
     margin-top:6px;
     font-size:11px;
     padding:3px;
 }
 
+/* TALK BUTTON (INCHANGÉ) */
 #talk {
     width:80px;
     height:80px;
@@ -77,8 +91,11 @@ input, button {
     box-shadow: 0 0 20px rgba(255,0,0,0.6), inset 0 0 15px rgba(255,255,255,0.2);
 }
 
-#talk:active { transform:scale(0.95); }
+#talk:active {
+    transform:scale(0.95);
+}
 
+/* SMS */
 .sms-area {
     margin-top:10px;
     border-top:1px solid #0f0;
@@ -107,6 +124,7 @@ input, button {
     height:35px;
     font-size:12px;
     margin:0;
+    padding:0 5px;
 }
 
 .sms-input button {
@@ -114,11 +132,21 @@ input, button {
     height:35px;
     margin:0;
     font-size:11px;
+    padding:0;
 }
 
-.msg { margin-bottom:4px; word-wrap:break-word; }
-.msg span { color:#ff0; }
-.msg.me { color:#0f0; }
+.msg {
+    margin-bottom:4px;
+    word-wrap:break-word;
+}
+
+.msg span {
+    color:#ff0;
+}
+
+.msg.me {
+    color:#0f0;
+}
 </style>
 </head>
 
@@ -130,7 +158,7 @@ input, button {
 
 <h2>P2P CALL</h2>
 
-<input id="room" placeholder="Nom (ex: team)">
+<input id="room" placeholder="Code / clé">
 <button onclick="joinRoom()">ENTRER</button>
 
 <div id="status">En attente...</div>
@@ -139,7 +167,7 @@ input, button {
     <div class="sms-box" id="smsBox"></div>
     <div class="sms-input">
         <input type="text" id="smsInput" placeholder="Message">
-        <button onclick="sendSMS()">OK</button>
+        <button onclick="sendSMS()">ENVOYER</button>
     </div>
 </div>
 
@@ -148,7 +176,7 @@ input, button {
 </div>
 
 <script>
-// MATRIX
+// MATRIX (INCHANGÉ)
 const c = document.getElementById("matrix");
 const ctx = c.getContext("2d");
 c.width = window.innerWidth;
@@ -177,53 +205,54 @@ function draw(){
 }
 setInterval(draw,33);
 
-// PEER ROOM
+// 🔥 PEER FIX ROOM AUTO
 let peer;
-let connections = [];
+let connections=[];
 
 function joinRoom(){
-    const room = document.getElementById("room").value.trim();
+    const room=document.getElementById("room").value.trim();
     if(!room) return;
 
-    peer = new Peer(room);
+    peer=new Peer(room);
 
-    peer.on("open", ()=>{
-        document.getElementById("status").innerText = "ROOM créée";
+    peer.on("open",()=>{
+        document.getElementById("status").innerText="ROOM créée";
     });
 
-    peer.on("error", ()=>{
-        const id = room + "_" + Math.floor(Math.random()*10000);
-        peer = new Peer(id);
+    peer.on("error",()=>{
+        const id=room+"_"+Math.floor(Math.random()*10000);
+        peer=new Peer(id);
 
-        peer.on("open", ()=>{
-            const conn = peer.connect(room);
+        peer.on("open",()=>{
+            const conn=peer.connect(room);
             setup(conn);
-            document.getElementById("status").innerText = "connecté";
+            document.getElementById("status").innerText="connecté";
         });
 
-        peer.on("connection", conn=>setup(conn));
+        peer.on("connection",setup);
     });
 
-    peer.on("connection", conn=>setup(conn));
+    peer.on("connection",setup);
 }
 
 function setup(conn){
-    conn.on("open", ()=>{
+    conn.on("open",()=>{
         connections.push(conn);
-        document.getElementById("status").innerText = "connecté ("+connections.length+")";
+        document.getElementById("status").innerText="connecté ("+connections.length+")";
     });
 
-    conn.on("data", data=>{
+    conn.on("data",data=>{
         if(data.type==="sms"){
-            addSMS("Ami", data.msg);
+            addSMS("Ami",data.msg);
         }
+
         if(data.type==="audio"){
             new Audio(URL.createObjectURL(data.blob)).play();
         }
     });
 }
 
-// SMS
+// SMS (INCHANGÉ)
 function sendSMS(){
     const input = document.getElementById("smsInput");
     const msg = input.value.trim();
@@ -250,39 +279,48 @@ function addSMS(sender, msg){
     box.scrollTop = box.scrollHeight;
 }
 
-// AUDIO
-let stream, recorder, chunks=[];
+// 🔥 AUDIO FIX (maintien réel + stable)
+let stream, recorder;
+let isTalking=false;
 
 const talk = document.getElementById("talk");
 
-talk.onpointerdown=start;
-talk.onpointerup=stop;
+talk.addEventListener("touchstart", start);
+talk.addEventListener("touchend", stop);
+talk.addEventListener("mousedown", start);
+talk.addEventListener("mouseup", stop);
 
-async function start(){
-    if(connections.length===0) return;
+async function start(e){
+    e.preventDefault();
+    if(isTalking) return;
+    isTalking=true;
 
     if(!stream){
         stream = await navigator.mediaDevices.getUserMedia({audio:true});
     }
 
-    chunks=[];
-    recorder=new MediaRecorder(stream);
-    recorder.ondataavailable=e=>chunks.push(e.data);
-    recorder.start();
+    recorder = new MediaRecorder(stream);
+
+    recorder.ondataavailable = e=>{
+        if(e.data.size>0){
+            connections.forEach(c=>{
+                if(c.open){
+                    c.send({type:"audio", blob:e.data});
+                }
+            });
+        }
+    };
+
+    recorder.start(200);
 }
 
-function stop(){
-    if(!recorder) return;
+function stop(e){
+    e.preventDefault();
+    if(!isTalking) return;
+    isTalking=false;
 
-    recorder.stop();
-
-    recorder.onstop=()=>{
-        const blob=new Blob(chunks,{type:"audio/webm"});
-        connections.forEach(c=>{
-            if(c.open){
-                c.send({type:"audio", blob});
-            }
-        });
+    if(recorder){
+        recorder.stop();
     }
 }
 </script>
