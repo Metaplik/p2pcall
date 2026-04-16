@@ -1,351 +1,301 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>CRYPT</title>
-
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-
-<style>
-body {
-    margin:0;
-    background:black;
-    color:#0f0;
-    font-family: monospace;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    height:100vh;
-    overflow:hidden;
-    padding:10px;
-    box-sizing:border-box;
-}
-
-canvas {
-    position:fixed;
-    top:0;
-    left:0;
-    width:100%;
-    height:100%;
-    z-index:0;
-}
-
-* {
-    -webkit-user-select:none;
-    user-select:none;
-    -webkit-tap-highlight-color: transparent;
-}
-
-.box {
-    position:relative;
-    z-index:1;
-    width:100%;
-    max-width:300px;
-    background:rgba(0,0,0,0.95);
-    border:2px solid #0f0;
-    border-radius:12px;
-    padding:12px;
-    text-align:center;
-    box-sizing:border-box;
-}
-
-h2 {
-    margin:0 0 8px;
-    font-size:18px;
-}
-
-input, button {
-    width:100%;
-    height:40px;
-    margin:4px 0;
-    padding:0 8px;
-    background:#111;
-    border:1.5px solid #0f0;
-    color:#0f0;
-    font-size:14px;
-    text-align:center;
-    border-radius:6px;
-    box-sizing:border-box;
-}
-
-#status {
-    margin-top:6px;
-    font-size:11px;
-    padding:3px;
-}
-
-#talk {
-    width:80px;
-    height:80px;
-    margin:10px auto;
-    border-radius:50%;
-    border:none;
-    cursor:pointer;
-    background:radial-gradient(circle at 30% 30%, #ff4d4d, #cc0000);
-    box-shadow: 0 0 20px rgba(255,0,0,0.6), inset 0 0 15px rgba(255,255,255,0.2);
-}
-
-#talk:active {
-    transform:scale(0.95);
-}
-
-.sms-area {
-    margin-top:10px;
-    border-top:1px solid #0f0;
-    padding-top:8px;
-}
-
-.sms-box {
-    background:#000;
-    border:1px solid #0f0;
-    border-radius:6px;
-    height:100px;
-    overflow-y:auto;
-    padding:5px;
-    margin-bottom:6px;
-    text-align:left;
-    font-size:11px;
-}
-
-.sms-input {
-    display:flex;
-    gap:5px;
-}
-
-.sms-input input {
-    flex:1;
-    height:35px;
-    font-size:12px;
-    margin:0;
-    padding:0 5px;
-}
-
-.sms-input button {
-    width:55px;
-    height:35px;
-    margin:0;
-    font-size:11px;
-    padding:0;
-}
-
-.msg {
-    margin-bottom:4px;
-    word-wrap:break-word;
-}
-
-.msg span {
-    color:#ff0;
-}
-
-.msg.me {
-    color:#0f0;
-}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>CRYPT</title>
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            background: black;
+            color: #0f0;
+            font-family: monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+        canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+        * {
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .box {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 300px;
+            background: rgba(0,0,0,0.95);
+            border: 2px solid #0f0;
+            border-radius: 12px;
+            padding: 12px;
+            text-align: center;
+            box-sizing: border-box;
+        }
+        h2 { margin: 0 0 8px; font-size: 18px; }
+        input, button {
+            width: 100%;
+            height: 40px;
+            margin: 4px 0;
+            padding: 0 8px;
+            background: #111;
+            border: 1.5px solid #0f0;
+            color: #0f0;
+            font-size: 14px;
+            text-align: center;
+            border-radius: 6px;
+            box-sizing: border-box;
+        }
+        #status {
+            margin-top: 6px;
+            font-size: 11px;
+            padding: 3px;
+        }
+        #talk {
+            width: 80px;
+            height: 80px;
+            margin: 10px auto;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            background: radial-gradient(circle at 30% 30%, #ff4d4d, #cc0000);
+            box-shadow: 0 0 20px rgba(255,0,0,0.6);
+        }
+        #talk:active { transform: scale(0.95); }
+        .sms-area {
+            margin-top: 10px;
+            border-top: 1px solid #0f0;
+            padding-top: 8px;
+        }
+        .sms-box {
+            background: #000;
+            border: 1px solid #0f0;
+            border-radius: 6px;
+            height: 100px;
+            overflow-y: auto;
+            padding: 5px;
+            margin-bottom: 6px;
+            text-align: left;
+            font-size: 11px;
+        }
+        .sms-input {
+            display: flex;
+            gap: 5px;
+        }
+        .sms-input input {
+            flex: 1;
+            height: 35px;
+            font-size: 12px;
+            margin: 0;
+        }
+        .sms-input button {
+            width: 55px;
+            height: 35px;
+            margin: 0;
+        }
+        .msg { margin-bottom: 4px; word-wrap: break-word; }
+        .msg span { color: #ff0; }
+        .msg.me { color: #0f0; }
+    </style>
 </head>
-
 <body>
-
 <canvas id="matrix"></canvas>
-
 <div class="box">
-
-<h2>CRYPT</h2>
-
-<input id="room" placeholder="code">
-<button onclick="joinRoom()">ENTRER</button>
-
-<div id="status"></div>
-
-<div class="sms-area">
-    <div class="sms-box" id="smsBox"></div>
-    <div class="sms-input">
-        <input type="text" id="smsInput" placeholder="message">
-        <button onclick="sendSMS()">OK</button>
+    <h2>CRYPT</h2>
+    <input id="room" placeholder="code">
+    <button onclick="joinRoom()">ENTRER</button>
+    <div id="status"></div>
+    <div class="sms-area">
+        <div class="sms-box" id="smsBox"></div>
+        <div class="sms-input">
+            <input type="text" id="smsInput" placeholder="message">
+            <button onclick="sendSMS()">OK</button>
+        </div>
     </div>
-</div>
-
-<button id="talk"></button>
-
+    <button id="talk"></button>
 </div>
 
 <script>
-// MATRIX
-const c = document.getElementById("matrix");
-const ctx = c.getContext("2d");
-c.width = window.innerWidth;
-c.height = window.innerHeight;
-
-let letters = "01CRYPT".split("");
-let font = 12;
-let cols = Math.floor(c.width / font);
-let drops = [];
-
-for(let i = 0; i < cols; i++) drops[i] = 1;
-
-function draw(){
-    ctx.fillStyle = "rgba(0,0,0,0.05)";
-    ctx.fillRect(0, 0, c.width, c.height);
-    ctx.fillStyle = "#0f0";
-    ctx.font = font + "px monospace";
-
-    for(let i = 0; i < drops.length; i++){
-        let text = letters[Math.floor(Math.random()*letters.length)];
-        ctx.fillText(text, i * font, drops[i] * font);
-
-        if(drops[i] * font > c.height && Math.random() > 0.975) drops[i] = 0;
-        drops[i]++;
+    // === MATRIX (décor) ===
+    const c = document.getElementById("matrix");
+    const ctx = c.getContext("2d");
+    c.width = window.innerWidth;
+    c.height = window.innerHeight;
+    let letters = "01CRYPT".split("");
+    let font = 12;
+    let cols = Math.floor(c.width / font);
+    let drops = [];
+    for (let i = 0; i < cols; i++) drops[i] = 1;
+    function draw() {
+        ctx.fillStyle = "rgba(0,0,0,0.05)";
+        ctx.fillRect(0, 0, c.width, c.height);
+        ctx.fillStyle = "#0f0";
+        ctx.font = font + "px monospace";
+        for (let i = 0; i < drops.length; i++) {
+            let text = letters[Math.floor(Math.random() * letters.length)];
+            ctx.fillText(text, i * font, drops[i] * font);
+            if (drops[i] * font > c.height && Math.random() > 0.975) drops[i] = 0;
+            drops[i]++;
+        }
     }
-}
-setInterval(draw,33);
+    setInterval(draw, 33);
 
-// ===== SYSTEME QUI MARCHE COMME WALKIE.CLOUD =====
-let peer;
-let connections = [];
-let myStream;
-let recorder;
-let talking = false;
+    // === VRAIE LOGIQUE P2P (identique à walkie.cloud) ===
+    let peer;               // l'instance PeerJS
+    let connections = [];   // les connexions actives vers les autres
+    let localStream;        // flux microphone
+    let mediaRecorder;      // pour capturer l'audio
+    let isTalking = false;  // état du bouton poussé
+    let currentRoom = "";   // nom de la salle
 
-function joinRoom() {
-    let room = document.getElementById("room").value.trim();
-    if(!room) return;
-    
-    // Nettoie les anciennes connexions
-    if(peer) {
-        connections.forEach(c => { try{c.close()}catch(e){} });
-        peer.destroy();
-        connections = [];
-    }
-    
-    // Crée un ID aléatoire pour soi
-    let myId = room + "_" + Math.floor(Math.random() * 1000000);
-    peer = new Peer(myId);
-    
-    peer.on("open", () => {
-        document.getElementById("status").innerText = "création...";
-        
-        // Se connecter à la room principale
-        let conn = peer.connect(room);
-        setupConn(conn);
-    });
-    
-    peer.on("connection", (conn) => {
-        setupConn(conn);
-    });
-    
-    peer.on("error", (err) => {
-        document.getElementById("status").innerText = "erreur";
-    });
-}
+    async function joinRoom() {
+        const roomName = document.getElementById("room").value.trim();
+        if (!roomName) return;
+        currentRoom = roomName;
 
-function setupConn(conn) {
-    conn.on("open", () => {
-        // Évite les doublons
-        if(!connections.find(c => c.peer === conn.peer)) {
-            connections.push(conn);
-            document.getElementById("status").innerText = connections.length + " connecté(s)";
+        // Nettoyer anciennes connexions
+        if (peer) {
+            connections.forEach(conn => { try { conn.close(); } catch(e) {} });
+            peer.destroy();
+            connections = [];
         }
-    });
-    
-    conn.on("data", (data) => {
-        if(data.type === "sms") {
-            addMessage("autre", data.msg);
-        }
-        if(data.type === "audio" && data.blob) {
-            let audio = new Audio(URL.createObjectURL(data.blob));
-            audio.play();
-        }
-    });
-    
-    conn.on("close", () => {
-        connections = connections.filter(c => c.peer !== conn.peer);
-        document.getElementById("status").innerText = connections.length + " connecté(s)";
-    });
-}
 
-// SMS
-function sendSMS() {
-    let input = document.getElementById("smsInput");
-    let msg = input.value.trim();
-    if(!msg) return;
-    
-    addMessage("moi", msg);
-    
-    connections.forEach(c => {
-        if(c.open) c.send({type:"sms", msg:msg});
-    });
-    
-    input.value = "";
-}
+        // 1. Tenter de créer le peer avec l'ID = nom de la salle
+        peer = new Peer(roomName);
 
-function addMessage(who, msg) {
-    let box = document.getElementById("smsBox");
-    let div = document.createElement("div");
-    div.className = "msg";
-    if(who === "moi") {
-        div.classList.add("me");
-        div.innerHTML = `<span>moi:</span> ${msg}`;
-    } else {
-        div.innerHTML = `<span>autre:</span> ${msg}`;
-    }
-    box.appendChild(div);
-    box.scrollTop = box.scrollHeight;
-}
+        peer.on("open", () => {
+            // Succès : je suis le premier (ou le seul) dans cette salle
+            document.getElementById("status").innerText = "en attente...";
+        });
 
-// TALKIE-WALKIE
-let talkBtn = document.getElementById("talk");
+        peer.on("connection", (conn) => {
+            // Quelqu'un se connecte à moi
+            addConnection(conn);
+        });
 
-talkBtn.addEventListener("mousedown", startTalking);
-talkBtn.addEventListener("mouseup", stopTalking);
-talkBtn.addEventListener("touchstart", startTalking);
-talkBtn.addEventListener("touchend", stopTalking);
-
-async function startTalking(e) {
-    e.preventDefault();
-    if(talking) return;
-    if(connections.length === 0) return;
-    
-    try {
-        if(!myStream) {
-            myStream = await navigator.mediaDevices.getUserMedia({audio: true});
-        }
-        
-        talking = true;
-        recorder = new MediaRecorder(myStream);
-        
-        recorder.ondataavailable = (event) => {
-            if(event.data.size > 0 && connections.length > 0) {
-                connections.forEach(c => {
-                    if(c.open) {
-                        c.send({type:"audio", blob:event.data});
-                    }
+        peer.on("error", (err) => {
+            if (err.type === "peer-unavailable" || err.type === "ID taken") {
+                // L'ID roomName est déjà pris => je ne peux pas le créer
+                // Donc je me connecte en tant que client avec un ID aléatoire
+                const randomId = roomName + "_" + Math.random().toString(36).substr(2, 8);
+                peer = new Peer(randomId);
+                peer.on("open", () => {
+                    const conn = peer.connect(roomName);
+                    addConnection(conn);
+                    document.getElementById("status").innerText = "connexion...";
                 });
+                peer.on("connection", (conn) => addConnection(conn));
+                peer.on("error", (e) => document.getElementById("status").innerText = "erreur");
+            } else {
+                document.getElementById("status").innerText = "erreur";
             }
-        };
-        
-        recorder.start(100);
-    } catch(e) {}
-}
+        });
+    }
 
-function stopTalking(e) {
-    e.preventDefault();
-    if(!talking) return;
-    
-    if(recorder && recorder.state === "recording") {
-        recorder.stop();
+    function addConnection(conn) {
+        conn.on("open", () => {
+            if (!connections.find(c => c.peer === conn.peer)) {
+                connections.push(conn);
+                document.getElementById("status").innerText = connections.length + " connecté(s)";
+            }
+        });
+        conn.on("data", (data) => {
+            if (data.type === "sms") {
+                addMessage("autre", data.msg);
+            } else if (data.type === "audio" && data.blob) {
+                const audio = new Audio(URL.createObjectURL(data.blob));
+                audio.play();
+            }
+        });
+        conn.on("close", () => {
+            connections = connections.filter(c => c.peer !== conn.peer);
+            document.getElementById("status").innerText = connections.length + " connecté(s)";
+        });
     }
-    talking = false;
-}
 
-window.addEventListener("beforeunload", () => {
-    if(myStream) {
-        myStream.getTracks().forEach(t => t.stop());
+    // === SMS ===
+    function sendSMS() {
+        const input = document.getElementById("smsInput");
+        const msg = input.value.trim();
+        if (!msg) return;
+        addMessage("moi", msg);
+        connections.forEach(conn => {
+            if (conn.open) conn.send({ type: "sms", msg: msg });
+        });
+        input.value = "";
     }
-    if(peer) {
-        peer.destroy();
+
+    function addMessage(who, msg) {
+        const box = document.getElementById("smsBox");
+        const div = document.createElement("div");
+        div.className = "msg";
+        if (who === "moi") {
+            div.classList.add("me");
+            div.innerHTML = `<span>moi:</span> ${msg}`;
+        } else {
+            div.innerHTML = `<span>autre:</span> ${msg}`;
+        }
+        box.appendChild(div);
+        box.scrollTop = box.scrollHeight;
     }
-});
+
+    // === TALKIE-WALKIE (bouton rouge) ===
+    const talkBtn = document.getElementById("talk");
+    talkBtn.addEventListener("mousedown", startTalk);
+    talkBtn.addEventListener("mouseup", stopTalk);
+    talkBtn.addEventListener("touchstart", startTalk);
+    talkBtn.addEventListener("touchend", stopTalk);
+
+    async function startTalk(e) {
+        e.preventDefault();
+        if (isTalking) return;
+        if (!currentRoom) return;
+        if (connections.length === 0) return;
+
+        try {
+            if (!localStream) {
+                localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            }
+            isTalking = true;
+            mediaRecorder = new MediaRecorder(localStream);
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0 && connections.length) {
+                    connections.forEach(conn => {
+                        if (conn.open) conn.send({ type: "audio", blob: event.data });
+                    });
+                }
+            };
+            mediaRecorder.start(100); // envoi par paquets de 100ms
+        } catch (err) {
+            isTalking = false;
+        }
+    }
+
+    function stopTalk(e) {
+        e.preventDefault();
+        if (!isTalking) return;
+        if (mediaRecorder && mediaRecorder.state === "recording") {
+            mediaRecorder.stop();
+        }
+        isTalking = false;
+    }
+
+    // Nettoyage à la fermeture
+    window.addEventListener("beforeunload", () => {
+        if (localStream) localStream.getTracks().forEach(t => t.stop());
+        if (peer) peer.destroy();
+    });
 </script>
-
 </body>
 </html>
