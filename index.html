@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>P2P CALL</title>
+<title>CRYPT</title>
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 
@@ -22,7 +22,6 @@ body {
     box-sizing:border-box;
 }
 
-/* MATRIX */
 canvas {
     position:fixed;
     top:0;
@@ -32,14 +31,12 @@ canvas {
     z-index:0;
 }
 
-/* 🔥 FIX ANDROID (sans toucher design) */
 * {
     -webkit-user-select:none;
     user-select:none;
     -webkit-tap-highlight-color: transparent;
 }
 
-/* BOX */
 .box {
     position:relative;
     z-index:1;
@@ -72,14 +69,12 @@ input, button {
     box-sizing:border-box;
 }
 
-/* STATUS */
 #status {
     margin-top:6px;
     font-size:11px;
     padding:3px;
 }
 
-/* TALK BUTTON (INCHANGÉ) */
 #talk {
     width:80px;
     height:80px;
@@ -95,7 +90,6 @@ input, button {
     transform:scale(0.95);
 }
 
-/* SMS */
 .sms-area {
     margin-top:10px;
     border-top:1px solid #0f0;
@@ -156,18 +150,18 @@ input, button {
 
 <div class="box">
 
-<h2>P2P CALL</h2>
+<h2>CRYPT</h2>
 
-<input id="room" placeholder="Code / clé">
+<input id="room" placeholder="code">
 <button onclick="joinRoom()">ENTRER</button>
 
-<div id="status">En attente...</div>
+<div id="status"></div>
 
 <div class="sms-area">
     <div class="sms-box" id="smsBox"></div>
     <div class="sms-input">
-        <input type="text" id="smsInput" placeholder="Message">
-        <button onclick="sendSMS()">ENVOYER</button>
+        <input type="text" id="smsInput" placeholder="message">
+        <button onclick="sendSMS()">OK</button>
     </div>
 </div>
 
@@ -176,13 +170,12 @@ input, button {
 </div>
 
 <script>
-// MATRIX (INCHANGÉ)
 const c = document.getElementById("matrix");
 const ctx = c.getContext("2d");
 c.width = window.innerWidth;
 c.height = window.innerHeight;
 
-let letters = "01P2P".split("");
+let letters = "01CRYPT".split("");
 let font = 12;
 let cols = Math.floor(c.width / font);
 let drops = [];
@@ -205,124 +198,195 @@ function draw(){
 }
 setInterval(draw,33);
 
-// 🔥 PEER FIX ROOM AUTO
 let peer;
-let connections=[];
+let connections = [];
+let currentRoom = null;
+let stream = null;
+let mediaRecorder = null;
+let isTalking = false;
 
-function joinRoom(){
-    const room=document.getElementById("room").value.trim();
-    if(!room) return;
-
-    peer=new Peer(room);
-
-    peer.on("open",()=>{
-        document.getElementById("status").innerText="ROOM créée";
-    });
-
-    peer.on("error",()=>{
-        const id=room+"_"+Math.floor(Math.random()*10000);
-        peer=new Peer(id);
-
-        peer.on("open",()=>{
-            const conn=peer.connect(room);
-            setup(conn);
-            document.getElementById("status").innerText="connecté";
+function joinRoom() {
+    const roomInput = document.getElementById("room");
+    const roomName = roomInput.value.trim();
+    
+    if (!roomName) return;
+    
+    if (peer) {
+        connections.forEach(conn => {
+            if (conn && conn.close) conn.close();
         });
-
-        peer.on("connection",setup);
+        connections = [];
+        peer.destroy();
+    }
+    
+    currentRoom = roomName;
+    
+    const peerId = roomName + "_" + Math.random().toString(36).substr(2, 6);
+    
+    peer = new Peer(peerId);
+    
+    peer.on('open', () => {
+        document.getElementById("status").innerText = "connecté";
+        
+        setTimeout(() => {
+            connectToRoom(roomName);
+        }, 500);
     });
-
-    peer.on("connection",setup);
+    
+    peer.on('connection', (conn) => {
+        handleNewConnection(conn);
+    });
+    
+    peer.on('error', (err) => {
+        if (err.type === 'peer-unavailable') {
+            document.getElementById("status").innerText = "erreur";
+        }
+    });
 }
 
-function setup(conn){
-    conn.on("open",()=>{
-        connections.push(conn);
-        document.getElementById("status").innerText="connecté ("+connections.length+")";
-    });
-
-    conn.on("data",data=>{
-        if(data.type==="sms"){
-            addSMS("Ami",data.msg);
+function connectToRoom(roomName) {
+    setTimeout(() => {
+        if (connections.length === 0) {
+            document.getElementById("status").innerText = "en attente";
         }
+    }, 1000);
+}
 
-        if(data.type==="audio"){
-            new Audio(URL.createObjectURL(data.blob)).play();
+function handleNewConnection(conn) {
+    conn.on('open', () => {
+        const exists = connections.some(c => c.peer === conn.peer);
+        if (!exists) {
+            connections.push(conn);
+            document.getElementById("status").innerText = connections.length + " connecté(s)";
+        }
+        
+        setupConnection(conn);
+    });
+    
+    conn.on('close', () => {
+        const index = connections.findIndex(c => c.peer === conn.peer);
+        if (index !== -1) {
+            connections.splice(index, 1);
+            document.getElementById("status").innerText = connections.length + " connecté(s)";
         }
     });
 }
 
-// SMS (INCHANGÉ)
-function sendSMS(){
+function setupConnection(conn) {
+    conn.on('data', (data) => {
+        if (data.type === 'sms') {
+            addSMS("autre", data.message);
+        } else if (data.type === 'audio' && data.blob) {
+            playAudio(data.blob);
+        }
+    });
+}
+
+function sendSMS() {
     const input = document.getElementById("smsInput");
-    const msg = input.value.trim();
-    if(!msg) return;
-
-    addSMS("Moi", msg);
-
-    connections.forEach(c=>{
-        if(c.open){
-            c.send({type:"sms", msg});
+    const message = input.value.trim();
+    
+    if (!message) return;
+    
+    if (!currentRoom) return;
+    
+    addSMS("moi", message);
+    
+    connections.forEach(conn => {
+        if (conn.open) {
+            conn.send({
+                type: 'sms',
+                message: message
+            });
         }
     });
-
-    input.value="";
+    
+    input.value = "";
 }
 
-function addSMS(sender, msg){
+function addSMS(sender, message) {
     const box = document.getElementById("smsBox");
     const div = document.createElement("div");
     div.className = "msg";
-    if(sender==="Moi") div.classList.add("me");
-    div.innerHTML = `<span>${sender}:</span> ${msg}`;
+    if (sender === "moi") {
+        div.classList.add("me");
+        div.innerHTML = `<span>moi:</span> ${message}`;
+    } else {
+        div.innerHTML = `<span>autre:</span> ${message}`;
+    }
     box.appendChild(div);
     box.scrollTop = box.scrollHeight;
 }
 
-// 🔥 AUDIO FIX (maintien réel + stable)
-let stream, recorder;
-let isTalking=false;
+const talkButton = document.getElementById("talk");
 
-const talk = document.getElementById("talk");
+talkButton.addEventListener("touchstart", startTalking);
+talkButton.addEventListener("touchend", stopTalking);
+talkButton.addEventListener("mousedown", startTalking);
+talkButton.addEventListener("mouseup", stopTalking);
 
-talk.addEventListener("touchstart", start);
-talk.addEventListener("touchend", stop);
-talk.addEventListener("mousedown", start);
-talk.addEventListener("mouseup", stop);
-
-async function start(e){
+async function startTalking(e) {
     e.preventDefault();
-    if(isTalking) return;
-    isTalking=true;
-
-    if(!stream){
-        stream = await navigator.mediaDevices.getUserMedia({audio:true});
-    }
-
-    recorder = new MediaRecorder(stream);
-
-    recorder.ondataavailable = e=>{
-        if(e.data.size>0){
-            connections.forEach(c=>{
-                if(c.open){
-                    c.send({type:"audio", blob:e.data});
-                }
-            });
+    if (isTalking) return;
+    
+    if (!currentRoom) return;
+    
+    try {
+        if (!stream) {
+            stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         }
-    };
-
-    recorder.start(200);
-}
-
-function stop(e){
-    e.preventDefault();
-    if(!isTalking) return;
-    isTalking=false;
-
-    if(recorder){
-        recorder.stop();
+        
+        isTalking = true;
+        mediaRecorder = new MediaRecorder(stream);
+        
+        mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0 && connections.length > 0) {
+                connections.forEach(conn => {
+                    if (conn.open) {
+                        conn.send({
+                            type: 'audio',
+                            blob: event.data
+                        });
+                    }
+                });
+            }
+        };
+        
+        mediaRecorder.start(100);
+        
+    } catch (err) {
+        isTalking = false;
     }
 }
+
+function stopTalking(e) {
+    e.preventDefault();
+    if (!isTalking) return;
+    
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+    }
+    
+    isTalking = false;
+}
+
+function playAudio(blob) {
+    try {
+        const audioUrl = URL.createObjectURL(blob);
+        const audio = new Audio(audioUrl);
+        audio.onended = () => URL.revokeObjectURL(audioUrl);
+        audio.play();
+    } catch (err) {}
+}
+
+window.addEventListener('beforeunload', () => {
+    if (peer) {
+        peer.destroy();
+    }
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+    }
+});
 </script>
 
 </body>
