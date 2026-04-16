@@ -199,100 +199,90 @@ function draw(){
 }
 setInterval(draw,33);
 
-// ===== SYSTEME P2P SIMPLE QUI MARCHE =====
+// ===== SYSTEME QUI MARCHE COMME WALKIE.CLOUD =====
 let peer;
 let connections = [];
-let currentRoom = "";
-let localStream = null;
-let mediaRecorder = null;
-let isTalking = false;
+let myStream;
+let recorder;
+let talking = false;
 
 function joinRoom() {
-    const roomName = document.getElementById("room").value.trim();
-    if (!roomName) return;
+    let room = document.getElementById("room").value.trim();
+    if(!room) return;
     
-    currentRoom = roomName;
-    
-    // Fermer l'ancien peer si existant
-    if (peer) {
+    // Nettoie les anciennes connexions
+    if(peer) {
+        connections.forEach(c => { try{c.close()}catch(e){} });
         peer.destroy();
         connections = [];
     }
     
-    // Créer un nouveau peer avec l'ID = le nom de la room
-    // Comme ça tout le monde avec le même nom se connecte automatiquement
-    peer = new Peer(roomName);
+    // Crée un ID aléatoire pour soi
+    let myId = room + "_" + Math.floor(Math.random() * 1000000);
+    peer = new Peer(myId);
     
     peer.on("open", () => {
-        document.getElementById("status").innerText = "connecté";
-    });
-    
-    peer.on("error", (err) => {
-        // Si l'ID est déjà pris, on se connecte en tant que client
-        if (err.type === "peer-unavailable" || err.type === "ID taken") {
-            connectToRoom(roomName);
-        } else {
-            document.getElementById("status").innerText = "erreur";
-        }
+        document.getElementById("status").innerText = "création...";
+        
+        // Se connecter à la room principale
+        let conn = peer.connect(room);
+        setupConn(conn);
     });
     
     peer.on("connection", (conn) => {
-        addConnection(conn);
+        setupConn(conn);
+    });
+    
+    peer.on("error", (err) => {
+        document.getElementById("status").innerText = "erreur";
     });
 }
 
-function connectToRoom(roomName) {
-    // Se connecter à la room existante
-    const conn = peer.connect(roomName);
-    if (conn) {
-        addConnection(conn);
-    }
-    document.getElementById("status").innerText = "connexion...";
-}
-
-function addConnection(conn) {
+function setupConn(conn) {
     conn.on("open", () => {
-        connections.push(conn);
-        document.getElementById("status").innerText = connections.length + " connecté(s)";
+        // Évite les doublons
+        if(!connections.find(c => c.peer === conn.peer)) {
+            connections.push(conn);
+            document.getElementById("status").innerText = connections.length + " connecté(s)";
+        }
     });
     
     conn.on("data", (data) => {
-        if (data.type === "sms") {
-            addSMS("autre", data.msg);
-        } else if (data.type === "audio" && data.blob) {
-            const audio = new Audio(URL.createObjectURL(data.blob));
+        if(data.type === "sms") {
+            addMessage("autre", data.msg);
+        }
+        if(data.type === "audio" && data.blob) {
+            let audio = new Audio(URL.createObjectURL(data.blob));
             audio.play();
         }
     });
     
     conn.on("close", () => {
-        connections = connections.filter(c => c !== conn);
+        connections = connections.filter(c => c.peer !== conn.peer);
         document.getElementById("status").innerText = connections.length + " connecté(s)";
     });
 }
 
 // SMS
 function sendSMS() {
-    const input = document.getElementById("smsInput");
-    const msg = input.value.trim();
-    if (!msg) return;
+    let input = document.getElementById("smsInput");
+    let msg = input.value.trim();
+    if(!msg) return;
     
-    addSMS("moi", msg);
+    addMessage("moi", msg);
     
-    connections.forEach(conn => {
-        if (conn.open) {
-            conn.send({ type: "sms", msg: msg });
-        }
+    connections.forEach(c => {
+        if(c.open) c.send({type:"sms", msg:msg});
     });
     
     input.value = "";
 }
 
-function addSMS(sender, msg) {
-    const box = document.getElementById("smsBox");
-    const div = document.createElement("div");
+function addMessage(who, msg) {
+    let box = document.getElementById("smsBox");
+    let div = document.createElement("div");
     div.className = "msg";
-    if (sender === "moi") {
+    if(who === "moi") {
         div.classList.add("me");
         div.innerHTML = `<span>moi:</span> ${msg}`;
     } else {
@@ -303,61 +293,55 @@ function addSMS(sender, msg) {
 }
 
 // TALKIE-WALKIE
-const talkBtn = document.getElementById("talk");
+let talkBtn = document.getElementById("talk");
 
-talkBtn.addEventListener("mousedown", startTalk);
-talkBtn.addEventListener("mouseup", stopTalk);
-talkBtn.addEventListener("touchstart", startTalk);
-talkBtn.addEventListener("touchend", stopTalk);
+talkBtn.addEventListener("mousedown", startTalking);
+talkBtn.addEventListener("mouseup", stopTalking);
+talkBtn.addEventListener("touchstart", startTalking);
+talkBtn.addEventListener("touchend", stopTalking);
 
-async function startTalk(e) {
+async function startTalking(e) {
     e.preventDefault();
-    if (isTalking) return;
-    
-    if (!peer) {
-        return;
-    }
+    if(talking) return;
+    if(connections.length === 0) return;
     
     try {
-        if (!localStream) {
-            localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        if(!myStream) {
+            myStream = await navigator.mediaDevices.getUserMedia({audio: true});
         }
         
-        isTalking = true;
-        mediaRecorder = new MediaRecorder(localStream);
+        talking = true;
+        recorder = new MediaRecorder(myStream);
         
-        mediaRecorder.ondataavailable = (event) => {
-            if (event.data.size > 0 && connections.length > 0) {
-                connections.forEach(conn => {
-                    if (conn.open) {
-                        conn.send({ type: "audio", blob: event.data });
+        recorder.ondataavailable = (event) => {
+            if(event.data.size > 0 && connections.length > 0) {
+                connections.forEach(c => {
+                    if(c.open) {
+                        c.send({type:"audio", blob:event.data});
                     }
                 });
             }
         };
         
-        mediaRecorder.start(100);
-    } catch(e) {
-        isTalking = false;
-    }
+        recorder.start(100);
+    } catch(e) {}
 }
 
-function stopTalk(e) {
+function stopTalking(e) {
     e.preventDefault();
-    if (!isTalking) return;
+    if(!talking) return;
     
-    if (mediaRecorder && mediaRecorder.state === "recording") {
-        mediaRecorder.stop();
+    if(recorder && recorder.state === "recording") {
+        recorder.stop();
     }
-    isTalking = false;
+    talking = false;
 }
 
-// Nettoyage
 window.addEventListener("beforeunload", () => {
-    if (localStream) {
-        localStream.getTracks().forEach(t => t.stop());
+    if(myStream) {
+        myStream.getTracks().forEach(t => t.stop());
     }
-    if (peer) {
+    if(peer) {
         peer.destroy();
     }
 });
