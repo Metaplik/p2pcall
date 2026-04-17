@@ -3,13 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CRYPT - Talkie-Walkie</title>
+    <title>CRYPT - Talkie-Walkie + SMS</title>
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-
     <style>
         @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
 
-        * { margin:0; padding:0; box-sizing:border-box; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
             overflow: hidden;
             background: #000;
@@ -20,93 +24,224 @@
             justify-content: center;
             align-items: center;
             position: relative;
-            padding: 10px;
+            padding: 12px;
         }
 
         #matrix {
             position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             z-index: 1;
-            opacity: 0.85;
+            display: block;
         }
 
         .overlay {
             position: relative;
             z-index: 2;
             width: 100%;
-            max-width: 360px;
+            max-width: 400px;
             background: rgba(10, 10, 10, 0.92);
-            border: 5px solid #0f0;
-            border-radius: 12px;
+            border: 3px solid #0f0;
+            border-radius: 16px;
             padding: 20px 18px;
-            box-shadow: 0 0 50px #0f0;
+            box-shadow: 0 0 25px rgba(0, 255, 0, 0.4);
             text-align: center;
-            max-height: 100vh;
+            max-height: 95vh;
             overflow-y: auto;
         }
 
-        h1 { font-size: 34px; margin-bottom: 8px; }
+        h1 {
+            font-size: 34px;
+            margin-bottom: 8px;
+            letter-spacing: 2px;
+        }
 
         input {
             width: 100%;
             padding: 12px;
             margin: 10px 0;
             background: #111;
-            border: 3px solid #0f0;
+            border: 2px solid #0f0;
             color: #0f0;
-            font-size: 22px;
+            font-size: 20px;
             text-align: center;
+            font-family: 'VT323', monospace;
         }
 
         button.small {
             background: #111;
             color: #0f0;
-            border: 3px solid #0f0;
-            padding: 9px 18px;
+            border: 2px solid #0f0;
+            padding: 8px 16px;
             margin: 6px;
-            font-size: 19px;
+            font-size: 18px;
+            font-family: 'VT323', monospace;
+            cursor: pointer;
+        }
+        button.small:active {
+            background: #0f0;
+            color: #000;
         }
 
+        /* BOUTON VIOLET FLUO - sans bordure blanche, avec contour lumineux animé */
         #talkBtn {
             width: 100%;
             max-width: 240px;
             height: 110px;
-            margin: 25px auto;
-            background: rgba(200, 0, 0, 0.78);
-            border: 6px solid #ddd;
+            margin: 20px auto;
+            background: rgba(155, 0, 255, 0.78);
+            border: none;
             border-radius: 12px;
             color: white;
             font-size: 38px;
             font-weight: bold;
+            font-family: 'VT323', monospace;
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow:
-                0 10px 25px rgba(255,0,0,0.6),
-                inset 0 8px 15px rgba(255,255,255,0.4),
-                inset 0 -8px 15px rgba(0,0,0,0.6);
+            cursor: pointer;
+            position: relative;
+            box-shadow: 0 0 15px rgba(155, 0, 255, 0.6);
+            transition: 0.05s linear;
         }
-
+        /* Contour lumineux animé (violet/cyan) */
+        #talkBtn::before {
+            content: '';
+            position: absolute;
+            top: -3px;
+            left: -3px;
+            right: -3px;
+            bottom: -3px;
+            background: linear-gradient(45deg, #ff00cc, #9b00ff, #00ffcc, #9b00ff, #ff00cc);
+            background-size: 300% 300%;
+            border-radius: 14px;
+            z-index: -1;
+            opacity: 0.8;
+            animation: borderMatrix 3s ease infinite;
+        }
+        @keyframes borderMatrix {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        /* Appui : devient vert fluo comme l'original */
         #talkBtn:active {
             background: rgba(0, 255, 0, 0.85);
-            color: #000;
-            border-color: #0f0;
             transform: scale(0.96);
+            box-shadow: 0 0 25px #0f0;
+        }
+        /* Le pseudo-élément reste actif même au clic pour garder le contour */
+        #talkBtn:active::before {
+            opacity: 0.6;
         }
 
-        #status { font-size: 22px; min-height: 45px; }
+        #status {
+            font-size: 20px;
+            min-height: 45px;
+            margin-top: 8px;
+        }
 
         .connected-list {
             background: #111;
-            border: 3px solid #0f0;
-            padding: 10px;
-            max-height: 130px;
+            border: 2px solid #0f0;
+            padding: 8px;
+            max-height: 100px;
             overflow-y: auto;
-            font-size: 19px;
+            font-size: 18px;
+            text-align: left;
+            margin: 8px 0;
         }
 
-        .info { font-size: 15px; color: #0a0; margin-top: 15px; }
+        .messaging-area {
+            margin-top: 18px;
+            border-top: 1px solid #2a8f2a;
+            padding-top: 12px;
+        }
+        .chat-title {
+            font-size: 18px;
+            text-align: left;
+            margin-bottom: 8px;
+        }
+        .messages-box {
+            background: #0a0a0a;
+            border: 1px solid #2a8f2a;
+            border-radius: 12px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 10px;
+            text-align: left;
+            max-height: 280px;
+            overflow-y: auto;
+        }
+        .msg-bubble {
+            max-width: 85%;
+            padding: 6px 10px;
+            border-radius: 14px;
+            font-size: 16px;
+            line-height: 1.3;
+            word-break: break-word;
+            font-family: 'VT323', monospace;
+        }
+        .msg-left {
+            align-self: flex-start;
+            background: #1a2a1a;
+            border-left: 3px solid #0f0;
+            color: #cfc;
+        }
+        .msg-right {
+            align-self: flex-end;
+            background: #2a3a2a;
+            border-right: 3px solid #0f0;
+            color: #efe;
+        }
+        .msg-sender {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-bottom: 3px;
+        }
+        .msg-time {
+            font-size: 10px;
+            text-align: right;
+            margin-top: 4px;
+            opacity: 0.6;
+        }
+        .chat-input-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 5px;
+        }
+        .chat-input-row input {
+            flex: 1;
+            margin: 0;
+            padding: 10px;
+            font-size: 16px;
+            background: #111;
+            border: 1px solid #0f0;
+            border-radius: 40px;
+        }
+        .chat-input-row button {
+            background: #111;
+            border: 1px solid #0f0;
+            color: #0f0;
+            padding: 0 20px;
+            border-radius: 40px;
+            font-size: 20px;
+            cursor: pointer;
+        }
+        .chat-input-row button:active {
+            background: #0f0;
+            color: black;
+        }
+
+        .info {
+            font-size: 13px;
+            color: #0a0;
+            margin-top: 12px;
+        }
     </style>
 </head>
 <body>
@@ -116,178 +251,332 @@
 <div class="overlay">
     <h1>CRYPT</h1>
 
-    <input type="text" id="roomName" placeholder="Nom de la salle (ex: toto)">
+    <input type="text" id="roomName" placeholder="Code">
     <button onclick="joinRoom()" class="small">REJOINDRE</button>
 
-    <div style="margin-top:12px;">Connectés :</div>
+    <div style="margin-top:8px; text-align:left;">Connectés :</div>
     <div id="connectedList" class="connected-list"></div>
 
-    <button id="talkBtn"></button>
+    <button id="talkBtn">PUSH</button>
 
     <div id="status">Prêt</div>
 
+    <div class="messaging-area">
+        <div class="chat-title">SMS secure</div>
+        <div id="messagesBox" class="messages-box"></div>
+        <div class="chat-input-row">
+            <input type="text" id="smsInput" placeholder="Écrire un message..." maxlength="200">
+            <button id="sendSmsBtn">➤</button>
+        </div>
+    </div>
+
     <div class="info">
-        Talkie-Walkie - Maintiens le bouton pour parler
+        Maintiens le bouton pour parler<br>
+        Envoie un message avec le champ ci-dessus
     </div>
 </div>
 
 <script>
-// MATRIX - inchangé
-const canvas = document.getElementById('matrix');
-const ctx = canvas.getContext('2d');
-function resize(){ canvas.width = innerWidth; canvas.height = innerHeight; }
-window.addEventListener('resize', resize);
-resize();
+    // MATRIX
+    const canvas = document.getElementById('matrix');
+    const ctx = canvas.getContext('2d');
+    let width, height;
+    let columns = [];
+    let drops = [];
+    const chars = "01アイウエオカキクケコ0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-const chars = "01アイウエオカキクケコ0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-let drops = Array(Math.floor(canvas.width / 16)).fill(1);
-
-setInterval(() => {
-    ctx.fillStyle = 'rgba(0,0,0,0.06)';
-    ctx.fillRect(0,0,canvas.width,canvas.height);
-    ctx.fillStyle = '#0f0';
-    ctx.font = '16px VT323';
-
-    for(let i=0;i<drops.length;i++){
-        const t = chars[Math.floor(Math.random()*chars.length)];
-        ctx.fillText(t,i*16,drops[i]*16);
-        if(drops[i]*16>canvas.height && Math.random()>0.975) drops[i]=0;
-        drops[i]++;
-    }
-},35);
-
-// ====================== LOGIQUE ======================
-let peer;
-let connections = [];
-let localStream = null;
-let mediaRecorder;
-let audioChunks = [];
-let isHost = false;
-
-const statusEl = document.getElementById('status');
-const connectedListEl = document.getElementById('connectedList');
-const talkBtn = document.getElementById('talkBtn');
-
-function joinRoom() {
-    const room = document.getElementById('roomName').value.trim();
-    if (!room) return statusEl.textContent = "Entre un nom de salle";
-
-    if (peer) {
-        connections.forEach(conn => { try { conn.close(); } catch(e){} });
-        peer.destroy();
-        connections = [];
-    }
-
-    statusEl.textContent = "Connexion...";
-
-    peer = new Peer(room, {
-        debug: 2,
-        config: {
-            iceServers: [
-                { urls: "stun:stun.l.google.com:19302" },
-                { urls: "stun:stun1.l.google.com:19302" }
-            ]
+    function resizeMatrix() {
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = width;
+        canvas.height = height;
+        const colCount = Math.floor(width / 18) + 5;
+        columns = colCount;
+        drops = new Array(colCount);
+        for (let i = 0; i < colCount; i++) {
+            drops[i] = Math.random() * -height;
         }
+    }
+
+    function drawMatrix() {
+        if (!ctx) return;
+        ctx.fillStyle = 'rgba(0,0,0,0.05)';
+        ctx.fillRect(0, 0, width, height);
+        ctx.fillStyle = '#0f0';
+        ctx.font = '18px "VT323", monospace';
+
+        for (let i = 0; i < columns; i++) {
+            const char = chars[Math.floor(Math.random() * chars.length)];
+            const x = i * 18;
+            const y = drops[i] * 18;
+            ctx.fillText(char, x, y);
+            if (y > height && Math.random() > 0.975) drops[i] = 0;
+            drops[i]++;
+        }
+        requestAnimationFrame(drawMatrix);
+    }
+
+    window.addEventListener('resize', () => {
+        resizeMatrix();
     });
+    resizeMatrix();
+    drawMatrix();
 
-    peer.on('open', () => {
-        isHost = true;
-        statusEl.textContent = `Hôte - Salle "${room}"`;
-    });
+    // SONS
+    function playBeep(freq, duration, vol = 0.2) {
+        try {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.frequency.value = freq;
+            gain.gain.value = vol;
+            osc.type = 'sine';
+            osc.start();
+            gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+            osc.stop(audioCtx.currentTime + duration);
+            setTimeout(() => audioCtx.close(), duration * 1000 + 100);
+        } catch(e) {}
+    }
+    function playTalkieStart() { playBeep(880, 0.08, 0.22); }
+    function playTalkieEnd() { playBeep(660, 0.12, 0.22); }
+    function playSmsSent() { playBeep(1200, 0.05, 0.18); setTimeout(() => playBeep(1500, 0.05, 0.18), 60); }
+    function playSmsReceived() { playBeep(1000, 0.07, 0.16); setTimeout(() => playBeep(800, 0.09, 0.16), 100); }
 
-    peer.on('connection', (conn) => addConnection(conn));
+    // LOGIQUE P2P
+    let peer;
+    let connections = [];
+    let localStream = null;
+    let mediaRecorder;
+    let audioChunks = [];
+    let isHost = false;
+    let myId = "";
 
-    peer.on('error', (err) => {
-        console.error(err);
-        if (err.type === 'unavailable-id') {
-            statusEl.textContent = "Salle prise → mode client";
-            const clientId = room + '_' + Math.random().toString(36).substr(2,8);
-            peer = new Peer(clientId, { debug: 2 });
-            peer.on('open', () => {
-                const conn = peer.connect(room);
-                addConnection(conn);
+    const statusEl = document.getElementById('status');
+    const connectedListEl = document.getElementById('connectedList');
+    const talkBtn = document.getElementById('talkBtn');
+    const messagesBox = document.getElementById('messagesBox');
+    const smsInput = document.getElementById('smsInput');
+    const sendSmsBtn = document.getElementById('sendSmsBtn');
+
+    function updateList() {
+        if (connections.length === 0) {
+            connectedListEl.innerHTML = "Aucun";
+        } else {
+            connectedListEl.innerHTML = connections.map(c => `→ ${c.peer.substring(0, 12)}`).join('<br>');
+        }
+    }
+
+    function escapeHtml(str) {
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
+
+    function addMessageToChat(text, sender, isOwn = false) {
+        const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const msgDiv = document.createElement('div');
+        msgDiv.classList.add('msg-bubble', isOwn ? 'msg-right' : 'msg-left');
+        msgDiv.innerHTML = `
+            <div class="msg-sender">${isOwn ? 'Moi' : sender}</div>
+            <div>${escapeHtml(text)}</div>
+            <div class="msg-time">${time}</div>
+        `;
+        messagesBox.appendChild(msgDiv);
+        msgDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+
+    function sendTextMessage(content) {
+        if (!content.trim()) return;
+        if (connections.length === 0) {
+            addMessageToChat("Personne connectée", "Système", false);
+            return;
+        }
+        addMessageToChat(content, myId.substring(0, 10), true);
+        playSmsSent();
+
+        const payload = {
+            type: 'text',
+            text: content,
+            senderId: myId,
+            timestamp: Date.now()
+        };
+
+        if (isHost) {
+            connections.forEach(conn => {
+                if (conn.open) conn.send(payload);
             });
         } else {
-            statusEl.textContent = "Erreur : " + err.type;
-        }
-    });
-}
-
-function addConnection(conn) {
-    conn.on('open', () => {
-        if (!connections.find(c => c.peer === conn.peer)) {
-            connections.push(conn);
-            updateList();
-            statusEl.textContent = connections.length + " connecté" + (connections.length > 1 ? "s" : "");
-        }
-    });
-
-    conn.on('data', (data) => {
-        if (data.type === 'audio' && data.blob) {
-            const blob = new Blob([data.blob], {type: 'audio/webm'});
-            const audio = new Audio(URL.createObjectURL(blob));
-            audio.play();
-
-            if (isHost) {
-                connections.forEach(c => {
-                    if (c !== conn && c.open) c.send(data);
-                });
+            if (connections[0] && connections[0].open) {
+                connections[0].send(payload);
             }
         }
-    });
+    }
 
-    conn.on('close', () => {
-        connections = connections.filter(c => c !== conn);
+    function addConnection(conn) {
+        if (connections.find(c => c.peer === conn.peer)) return;
+        connections.push(conn);
         updateList();
-    });
-}
+        statusEl.textContent = connections.length + " connecté" + (connections.length > 1 ? "s" : "");
 
-function updateList() {
-    connectedListEl.innerHTML = connections.length === 0 ? "Aucun" : connections.map(c => `→ ${c.peer}`).join('<br>');
-}
+        conn.on('data', (data) => {
+            if (data.type === 'audio' && data.blob) {
+                const blob = new Blob([data.blob], { type: 'audio/webm' });
+                const audio = new Audio(URL.createObjectURL(blob));
+                audio.play();
+                if (isHost) {
+                    connections.forEach(c => {
+                        if (c !== conn && c.open) c.send(data);
+                    });
+                }
+            }
+            else if (data.type === 'text' && data.text) {
+                const senderShort = data.senderId ? data.senderId.substring(0, 10) : "inconnu";
+                addMessageToChat(data.text, senderShort, false);
+                playSmsReceived();
+                if (isHost) {
+                    connections.forEach(c => {
+                        if (c !== conn && c.open) c.send(data);
+                    });
+                }
+            }
+        });
 
-// Push to talk
-async function startTalking() {
-    if (connections.length === 0) return statusEl.textContent = "Personne connecté";
-    if (!localStream) {
-        try {
-            localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        } catch(e) {
-            return statusEl.textContent = "Micro inaccessible";
+        conn.on('close', () => {
+            connections = connections.filter(c => c !== conn);
+            updateList();
+            statusEl.textContent = connections.length ? connections.length + " connecté(s)" : "Seul";
+        });
+    }
+
+    function joinRoom() {
+        const room = document.getElementById('roomName').value.trim();
+        if (!room) {
+            statusEl.textContent = "Entre un code";
+            return;
+        }
+        if (peer) {
+            connections.forEach(c => { try { c.close(); } catch(e){} });
+            peer.destroy();
+            connections = [];
+            if (localStream) localStream.getTracks().forEach(t => t.stop());
+            localStream = null;
+        }
+
+        statusEl.textContent = "Connexion...";
+        peer = new Peer(room, {
+            debug: 0,
+            config: { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] }
+        });
+
+        peer.on('open', (id) => {
+            myId = id;
+            isHost = true;
+            statusEl.textContent = `Hôte - Code "${room}"`;
+            updateList();
+        });
+
+        peer.on('connection', (conn) => {
+            addConnection(conn);
+        });
+
+        peer.on('error', (err) => {
+            if (err.type === 'unavailable-id') {
+                statusEl.textContent = "Code occupé → mode client";
+                const clientId = room + '_' + Math.random().toString(36).substr(2, 6);
+                const newPeer = new Peer(clientId, { debug: 0 });
+                newPeer.on('open', (id) => {
+                    myId = id;
+                    isHost = false;
+                    const connToHost = newPeer.connect(room);
+                    addConnection(connToHost);
+                    statusEl.textContent = `Client connecté au code "${room}"`;
+                    peer = newPeer;
+                });
+                newPeer.on('error', (e2) => {
+                    statusEl.textContent = "Erreur de connexion";
+                });
+                peer = newPeer;
+            } else {
+                statusEl.textContent = "Erreur : " + err.type;
+            }
+        });
+    }
+
+    // PUSH TO TALK avec sons
+    async function startTalking() {
+        if (connections.length === 0) {
+            statusEl.textContent = "Personne connecté";
+            return;
+        }
+        if (!localStream) {
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            } catch(e) {
+                statusEl.textContent = "Micro inaccessible";
+                return;
+            }
+        }
+        audioChunks = [];
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+        mediaRecorder = new MediaRecorder(localStream, { mimeType: 'audio/webm' });
+        mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+        mediaRecorder.start(100);
+        playTalkieStart();
+    }
+
+    function stopTalking() {
+        if (!mediaRecorder || mediaRecorder.state === 'inactive') return;
+        mediaRecorder.onstop = () => {
+            if (audioChunks.length === 0) return;
+            const blob = new Blob(audioChunks, { type: 'audio/webm' });
+            connections.forEach(conn => {
+                if (conn.open) conn.send({ type: 'audio', blob: blob });
+            });
+            statusEl.textContent = "Envoyé";
+            playTalkieEnd();
+            setTimeout(() => {
+                if (connections.length) statusEl.textContent = connections.length + " connecté(s)";
+                else statusEl.textContent = "Seul";
+            }, 800);
+        };
+        mediaRecorder.stop();
+    }
+
+    let pressing = false;
+    function onPress(e) { e.preventDefault(); if (!pressing) { pressing = true; startTalking(); } }
+    function onRelease(e) { e.preventDefault(); if (pressing) { pressing = false; stopTalking(); } }
+
+    talkBtn.addEventListener('pointerdown', onPress);
+    talkBtn.addEventListener('pointerup', onRelease);
+    talkBtn.addEventListener('pointerleave', onRelease);
+    talkBtn.addEventListener('pointercancel', onRelease);
+
+    function handleSendSms() {
+        const msg = smsInput.value.trim();
+        if (msg) {
+            sendTextMessage(msg);
+            smsInput.value = "";
         }
     }
-    audioChunks = [];
-    mediaRecorder = new MediaRecorder(localStream, { mimeType: 'audio/webm' });
-    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
-    mediaRecorder.start(100);
-}
+    sendSmsBtn.addEventListener('click', handleSendSms);
+    smsInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleSendSms();
+        }
+    });
 
-function stopTalking() {
-    if (!mediaRecorder) return;
-    mediaRecorder.onstop = () => {
-        if (audioChunks.length === 0) return;
-        const blob = new Blob(audioChunks, { type: 'audio/webm' });
-        connections.forEach(conn => {
-            if (conn.open) conn.send({ type: 'audio', blob: blob });
-        });
-        statusEl.textContent = "Envoyé";
-    };
-    mediaRecorder.stop();
-}
+    window.joinRoom = joinRoom;
 
-let isTalking = false;
-function press(e) { e.preventDefault(); if (!isTalking) { isTalking = true; startTalking(); } }
-function release(e) { e.preventDefault(); if (isTalking) { isTalking = false; stopTalking(); } }
-
-talkBtn.addEventListener('pointerdown', press);
-talkBtn.addEventListener('pointerup', release);
-talkBtn.addEventListener('pointerleave', release);
-talkBtn.addEventListener('pointercancel', release);
-
-window.addEventListener('beforeunload', () => {
-    if (localStream) localStream.getTracks().forEach(t => t.stop());
-    if (peer) peer.destroy();
-});
+    window.addEventListener('beforeunload', () => {
+        if (localStream) localStream.getTracks().forEach(t => t.stop());
+        if (peer) peer.destroy();
+    });
 </script>
 </body>
 </html>
